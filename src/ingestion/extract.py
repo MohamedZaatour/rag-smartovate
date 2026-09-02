@@ -70,6 +70,16 @@ def traiter_document(chemin):
             "texte": nettoyer_texte(page["texte"]),
         })
 
+    # Si AUCUN texte n'a ete extrait (toutes les pages vides), c'est
+    # souvent un PDF scanne (des images, pas du texte). On le signale
+    # clairement au lieu de laisser passer un document vide en silence.
+    total_caracteres = sum(len(page["texte"]) for page in pages_propres)
+    if total_caracteres == 0:
+        raise ValueError(
+            f"aucun texte extrait de {os.path.basename(chemin)} "
+            "(PDF scanne / image ? -> OCR a envisager)"
+        )
+
     resultat = {
         "nom_fichier": os.path.basename(chemin),
         "type": type_doc,

@@ -63,7 +63,9 @@ if __name__ == "__main__":
             print("=" * 45)
             print("Source S3       :", doc["source_s3"])
             print("Type            :", doc["type"])
-            print("Taille du texte :", len(doc["texte"]), "caracteres")
+            print("Nombre de pages :", doc["nb_pages"])
+            total_caracteres = sum(len(page["texte"]) for page in doc["pages"])
+            print("Taille du texte :", total_caracteres, "caracteres")
             succes += 1
         # On attrape VOLONTAIREMENT toute erreur : un document fautif ne doit
         # pas arreter l'ingestion (choix de robustesse assume).

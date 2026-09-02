@@ -1,39 +1,47 @@
 # ============================================================
-#  US 1.1 - Extraction du texte (PDF + Word) + nettoyage + metadonnees
-#  Boite a outils reutilisable : ne s'execute pas toute seule,
-#  ses fonctions sont importees par d'autres fichiers (ex: s3_loader.py).
+#  US 1.1 - Extraction du texte (PDF + Word)
+#  Version PAGE PAR PAGE : chaque morceau de texte garde son
+#  numero de page. Utile pour citer les sources plus tard
+#  ("d'apres la page 4...") et pour le decoupage (US 1.2).
 # ============================================================
 
-# 1) Bibliotheque standard de Python
 import os  # outils sur les chemins de fichiers
 import re  # nettoyage par motifs
-from datetime import datetime, timezone  # date/heure 
+from datetime import datetime, timezone  # date/heure
 
-import docx  # lecture de Word 
+import docx  # lecture de Word
 import pymupdf  # lecture de PDF
 
 
 def extraire_texte_pdf(chemin):
-    """Ouvre un fichier PDF et renvoie tout son texte brut."""
+    """Ouvre un PDF et renvoie une LISTE de pages numerotees.
+
+    Format : [{"page": 1, "texte": "..."}, {"page": 2, "texte": "..."}, ...]
+    """
     document = pymupdf.open(chemin)
-    texte = ""
-    for page in document:
-        texte += page.get_text()
+    pages = []
+    # enumerate donne le numero (1, 2, 3...) ET la page en meme temps.
+    for numero, page in enumerate(document, start=1):
+        pages.append({"page": numero, "texte": page.get_text()})
     document.close()
-    return texte
+    return pages
 
 
 def extraire_texte_docx(chemin):
-    """Ouvre un fichier Word (.docx) et renvoie tout son texte brut."""
+    """Ouvre un Word (.docx) et renvoie une liste d'UNE seule page.
+
+    Un .docx n'a pas de vraie notion de page (le texte se recompose selon
+    l'affichage), donc on traite tout le document comme un seul bloc = page 1.
+    """
     document = docx.Document(chemin)
     texte = ""
     for paragraphe in document.paragraphs:
         texte += paragraphe.text + "\n"
-    return texte
+    return [{"page": 1, "texte": texte}]
 
 
 def nettoyer_texte(texte):
-    """Nettoie le texte : caracteres invisibles, espaces et sauts de ligne en trop."""
+    """Nettoie un texte : caracteres invisibles, espaces et sauts de ligne en trop."""
     texte = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", texte)
     texte = re.sub(r"[ \t]+", " ", texte)
     texte = re.sub(r"\n{3,}", "\n\n", texte)
@@ -43,22 +51,30 @@ def nettoyer_texte(texte):
 
 
 def traiter_document(chemin):
-    """Aiguille selon le type (PDF ou Word), extrait, nettoie, renvoie texte + metadonnees."""
+    """Aiguille selon le type (PDF ou Word), extrait page par page, nettoie
+    chaque page, et renvoie les metadonnees + la liste des pages."""
     if chemin.lower().endswith(".pdf"):
-        texte_brut = extraire_texte_pdf(chemin)
+        pages_brutes = extraire_texte_pdf(chemin)
         type_doc = "pdf"
     elif chemin.lower().endswith(".docx"):
-        texte_brut = extraire_texte_docx(chemin)
+        pages_brutes = extraire_texte_docx(chemin)
         type_doc = "docx"
     else:
         raise ValueError(f"Format non supporte : {chemin}")
 
-    texte_propre = nettoyer_texte(texte_brut)
+    # On nettoie le texte de CHAQUE page, en conservant son numero.
+    pages_propres = []
+    for page in pages_brutes:
+        pages_propres.append({
+            "page": page["page"],
+            "texte": nettoyer_texte(page["texte"]),
+        })
 
     resultat = {
         "nom_fichier": os.path.basename(chemin),
         "type": type_doc,
         "date_extraction": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-        "texte": texte_propre,
+        "nb_pages": len(pages_propres),
+        "pages": pages_propres,
     }
     return resultat

@@ -8,7 +8,7 @@ import tempfile  # dossier temporaire du systeme (pour les fichiers jetables)
 
 import boto3  # SDK AWS pour Python
 from dotenv import load_dotenv  # charge la config depuis le fichier .env
-from extract import traiter_document  # notre chaine d'extraction (fichier extract.py)
+from ingestion.extract import traiter_document  # import qualifie via le package "ingestion"
 
 # Types de documents que l'on sait traiter
 TYPES_SUPPORTES = (".pdf", ".docx")

@@ -1,0 +1,26 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# --- Environnements virtuels ---
+venv/
+.venv/
+env/
+
+# --- Secrets & config locale : NE JAMAIS COMMIT ---
+.env
+.aws/
+*.pem
+
+# --- Donnees locales de test ---
+data/
+
+# --- VSCode (on garde seulement les recommandations d'extensions) ---
+.vscode/*
+!.vscode/extensions.json
+
+# --- OS ---
+.DS_Store
+Thumbs.db

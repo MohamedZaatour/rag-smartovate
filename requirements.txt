@@ -1,0 +1,18 @@
+# ============================================================
+#  Dependances du projet - Systeme RAG Smartovate
+#  Environnement conda : rag-smartovate (Python 3.11)
+# ============================================================
+
+# --- Sprint 1 : Ingestion & traitement des documents ---
+pymupdf==1.28.2          # Extraction du texte des PDF (s'importe avec : import pymupdf)
+python-docx==1.2.0       # Extraction du texte des fichiers Word (.docx) -> import docx
+boto3==1.43.83           # SDK AWS : acces a S3 (et Bedrock plus tard)
+python-dotenv==1.2.3     # Chargement de la configuration depuis un fichier .env -> import dotenv
+
+# --- Sprints suivants (a decommenter le moment venu) ---
+# langchain      # Orchestration du flux RAG
+# tiktoken       # Comptage de tokens pour le chunking
+# opensearch-py  # Client Python pour Amazon OpenSearch
+# fastapi        # API backend
+# uvicorn        # Serveur qui fait tourner FastAPI
+# streamlit      # Interface chatbot

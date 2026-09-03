@@ -14,9 +14,14 @@ from ingestion.extract import traiter_document  # import qualifie via le package
 TYPES_SUPPORTES = (".pdf", ".docx")
 
 
-def creer_client_s3(profil):
-    """Cree UN client S3 a partir d'un profil AWS (a reutiliser ensuite)."""
-    session = boto3.Session(profile_name=profil)
+def creer_client_s3(profil=None, region=None):
+    """Cree UN client S3 (a reutiliser ensuite).
+
+    - En LOCAL : un profil AWS est fourni (ex: 'smartovate').
+    - En DEPLOIEMENT : profil=None -> boto3 utilise automatiquement le
+      role IAM attache au service (Lambda/ECS). Le meme code marche partout.
+    """
+    session = boto3.Session(profile_name=profil, region_name=region)
     return session.client("s3")
 
 
@@ -48,11 +53,12 @@ def traiter_document_s3(s3, bucket, cle):
 if __name__ == "__main__":
     # Charger la configuration depuis le fichier .env
     load_dotenv()
-    profil = os.getenv("AWS_PROFILE")
+    profil = os.getenv("AWS_PROFILE")   # defini en local ; absent en deploiement (-> role IAM)
+    region = os.getenv("AWS_REGION")    # ex: us-west-2
     bucket = os.getenv("S3_BUCKET")
 
     # Creer le client S3 UNE SEULE FOIS, puis le reutiliser
-    s3 = creer_client_s3(profil)
+    s3 = creer_client_s3(profil, region)
 
     succes = 0
     echecs = 0

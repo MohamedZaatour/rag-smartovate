@@ -1,8 +1,7 @@
 # ============================================================
 #  US 1.1 - Extraction du texte (PDF + Word)
 #  Version PAGE PAR PAGE : chaque morceau de texte garde son
-#  numero de page. Utile pour citer les sources plus tard
-#  ("d'apres la page 4...") et pour le decoupage (US 1.2).
+#  numero de page. Le Word lit aussi les TABLEAUX, dans l'ordre.
 # ============================================================
 
 import os  # outils sur les chemins de fichiers
@@ -11,6 +10,13 @@ from datetime import datetime, timezone  # date/heure
 
 import docx  # lecture de Word
 import pymupdf  # lecture de PDF
+
+# Ces classes servent a reconnaitre, dans un .docx, ce qui est un
+# paragraphe (<w:p>) et ce qui est un tableau (<w:tbl>).
+from docx.oxml.table import CT_Tbl
+from docx.oxml.text.paragraph import CT_P
+from docx.table import Table
+from docx.text.paragraph import Paragraph
 
 
 def extraire_texte_pdf(chemin):
@@ -27,16 +33,46 @@ def extraire_texte_pdf(chemin):
     return pages
 
 
+def _parcourir_blocs(document):
+    """Parcourt le document Word DANS L'ORDRE et rend chaque bloc :
+    soit un Paragraph, soit un Table.
+
+    Word range les tableaux a part ; ici on lit le "corps" du document
+    element par element pour ne rien perdre et garder l'ordre d'origine.
+    """
+    corps = document.element.body  # le corps brut du document
+    for element in corps.iterchildren():
+        if isinstance(element, CT_P):        # <w:p> = un paragraphe
+            yield Paragraph(element, document)
+        elif isinstance(element, CT_Tbl):    # <w:tbl> = un tableau
+            yield Table(element, document)
+
+
+def _texte_du_tableau(table):
+    """Transforme un tableau en texte lisible :
+    cellules separees par ' | ', une ligne par rangee.
+    """
+    lignes = []
+    for rangee in table.rows:
+        cellules = [cellule.text.strip() for cellule in rangee.cells]
+        lignes.append(" | ".join(cellules))
+    return "\n".join(lignes)
+
+
 def extraire_texte_docx(chemin):
     """Ouvre un Word (.docx) et renvoie une liste d'UNE seule page.
 
-    Un .docx n'a pas de vraie notion de page (le texte se recompose selon
-    l'affichage), donc on traite tout le document comme un seul bloc = page 1.
+    On parcourt paragraphes ET tableaux dans l'ordre. Un .docx n'a pas de
+    vraie notion de page, donc tout le document = un seul bloc = page 1.
     """
     document = docx.Document(chemin)
-    texte = ""
-    for paragraphe in document.paragraphs:
-        texte += paragraphe.text + "\n"
+    morceaux = []
+    for bloc in _parcourir_blocs(document):
+        if isinstance(bloc, Paragraph):
+            morceaux.append(bloc.text)
+        elif isinstance(bloc, Table):
+            morceaux.append(_texte_du_tableau(bloc))
+    texte = "\n".join(morceaux)
     return [{"page": 1, "texte": texte}]
 
 

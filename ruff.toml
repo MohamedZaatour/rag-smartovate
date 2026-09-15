@@ -1,0 +1,13 @@
+# ============================================================
+#  Configuration de Ruff (linter + trieur d'imports)
+# ============================================================
+
+# On indique a Ruff ou se trouve NOTRE code source.
+# Grace a cela, il sait que "ingestion" est un package a nous
+# (et non une librairie externe comme boto3).
+src = ["src"]
+
+[lint.isort]
+# On le precise explicitement pour etre sur a 100% :
+# "ingestion" fait partie de notre projet -> 3e groupe d'imports.
+known-first-party = ["ingestion"]

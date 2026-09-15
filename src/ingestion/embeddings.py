@@ -6,9 +6,15 @@
 import json
 
 import boto3
+from botocore.config import Config
 
 # Modele d'embeddings d'Amazon (Titan Text Embeddings V2)
 MODELE_EMBEDDING = "amazon.titan-embed-text-v2:0"
+
+# boto3 REESSAIE automatiquement en cas d'erreur passagere (throttling, timeout),
+# avec une attente croissante entre les tentatives (backoff). Anticipe le bug
+# "timeouts" du cahier des charges, sans code manuel.
+_CONFIG_RETRY = Config(retries={"max_attempts": 4, "mode": "standard"})
 
 
 def creer_client_bedrock(profil=None, region=None):
@@ -17,7 +23,7 @@ def creer_client_bedrock(profil=None, region=None):
     Comme pour S3 : profil AWS en local, sinon boto3 prend le role IAM.
     """
     session = boto3.Session(profile_name=profil, region_name=region)
-    return session.client("bedrock-runtime")
+    return session.client("bedrock-runtime", config=_CONFIG_RETRY)
 
 
 def generer_embedding(client, texte, modele=MODELE_EMBEDDING):

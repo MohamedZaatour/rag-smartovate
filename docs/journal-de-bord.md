@@ -68,3 +68,48 @@ Construite pas à pas, en 5 marches :
 ---
 
 _« From zero to hero » — étape 1 franchie. 🚀_
+
+## Jour 2 — US 1.2 : Découpage & Vectorisation (Chunking & Embedding)
+
+_Date : 8 septembre 2026_
+
+---
+
+### 1. US 1.2 — terminée ✅ (chaîne complète, testée en réel)
+
+**Objectif :** transformer le texte extrait (US 1.1) en **chunks vectorisés**, prêts à être indexés dans OpenSearch.
+
+Construite en 3 briques + un orchestrateur :
+
+1. **`chunking.py`** — découpe chaque page en morceaux (« chunks ») de ~500 tokens avec 10 % de chevauchement (overlap), par une **fenêtre glissante**. Chaque chunk garde ses métadonnées (source, n° de page). L'overlap est calculé automatiquement (10 % de la taille).
+2. **`embeddings.py`** — envoie chaque chunk à **Amazon Titan Text Embeddings V2** via Bedrock (`invoke_model`) et récupère un **vecteur de 1024 dimensions**.
+3. **`pipeline.py`** — l'orchestrateur : pour chaque document du bucket S3, enchaîne **extraction → chunking → embeddings**.
+
+**Test réel réussi :** 2 documents (cahier des charges PDF → 6 chunks ; note Word → 1 chunk) → **7 chunks vectorisés** (dimension 1024), 0 échec.
+
+**Tests automatiques :** 15 tests pytest au vert (extraction + chunking + embeddings), avec des **mocks** pour ne pas appeler AWS.
+
+**Revue de code de fin de sprint :** fuite de fichier temporaire corrigée (`try/finally`), pagination S3 ajoutée, et **retry automatique** sur les appels Titan (anticipe les timeouts).
+
+### 2. Concepts appris aujourd'hui
+
+- **Chunk / chunking** : découper un document en petits passages focalisés — l'unité de recherche du RAG.
+- **Overlap (chevauchement)** : recopier la fin d'un chunk au début du suivant pour ne pas couper une idée en deux. Ici 10 % de la taille.
+- **Token** : l'unité de découpage des modèles de langage ; comptée avec **tiktoken**.
+- **Embedding / vecteur** : une liste de nombres représentant le **sens** d'un texte ; deux sens proches → deux vecteurs proches. C'est la base de la recherche sémantique.
+- **Bedrock / Titan** : appeler un modèle d'IA d'AWS via `invoke_model` (client `bedrock-runtime`).
+- **JSON** : `json.dumps` (emballer Python → JSON) et `json.loads` (déballer JSON → Python) pour dialoguer avec Titan.
+- **Générateur (`yield`)** : rendre les éléments un par un, à la demande.
+- **Chargement paresseux (lazy)** : charger une ressource coûteuse au premier usage, pas à l'import.
+- **Package & imports qualifiés** : `from ingestion.xxx import ...`, lancé avec `python -m ingestion.xxx`.
+- **Mock** : remplacer une dépendance (le client Titan) par un faux objet pour tester **sans réseau ni coût**.
+- **Retry / backoff** : boto3 réessaie tout seul en cas d'erreur passagère (via `Config`).
+
+### 3. Prochaines étapes
+
+- [ ] **Sprint 2 — Base vectorielle OpenSearch** : créer l'index (mapping avec un champ `knn_vector` de dimension 1024) et y **indexer** les chunks vectorisés.
+- [ ] Appel de suivi avec l'encadrant (M. Abdelkhalek).
+
+---
+
+_« From zero to hero » — Sprint 1 (Ingestion) bouclé. 🚀_

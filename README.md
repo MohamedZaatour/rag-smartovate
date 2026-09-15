@@ -30,7 +30,7 @@ pip install -r requirements.txt
 
 ## Avancement
 
-- [ ] Sprint 1 : Ingestion & traitement des donnees
+- [x] Sprint 1 : Ingestion & traitement des donnees (US 1.1 + US 1.2)
 - [ ] Sprint 2 : Base vectorielle OpenSearch
 - [ ] Sprint 3 : Moteur RAG (retrieval + generation)
 - [ ] Sprint 4 : Interface chatbot, deploiement & documentation

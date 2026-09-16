@@ -113,3 +113,60 @@ Construite en 3 briques + un orchestrateur :
 ---
 
 _« From zero to hero » — Sprint 1 (Ingestion) bouclé. 🚀_
+
+## Jour 3 — Sprint 2 / US 2.1 : Provisionnement de la base vectorielle (IaC)
+
+_Date : 14 septembre 2026_
+
+---
+
+### 1. US 2.1 — Infrastructure OpenSearch en CDK ✅ (déployée sur AWS)
+
+**Objectif :** créer, en Infrastructure as Code (AWS CDK Python), la collection OpenSearch Serverless qui hébergera les chunks vectorisés du Sprint 1.
+
+Construite en 4 « briques », dans un dossier `infra/` séparé du code applicatif :
+
+1. **Encryption policy** — chiffrement des données au repos, avec la clé gérée par AWS (`AWSOwnedKey`).
+2. **Network policy** — accès réseau **public** (le code tourne hors d'AWS), pour la collection et son dashboard.
+3. **Data access policy** — autorise le rôle **DataScientist** à lire/écrire (`aoss:ReadDocument` / `aoss:WriteDocument`) et à gérer les index. Répond au critère du cahier des charges.
+4. **La collection** `smartovate-rag-mohamed` (type `VECTORSEARCH`), avec des **dépendances explicites** pour se créer APRÈS les 3 policies.
+
+**Config externalisée :** les valeurs sensibles (nom de collection, ARN du rôle) sont sorties du code dans un fichier `infra/.env` (ignoré par Git), avec un `infra/.env.example` versionné comme modèle.
+
+**Déploiement réel réussi :** `cdk bootstrap` (déjà en place) puis `cdk deploy` → les 4 ressources créées dans le bon ordre, sans erreur. Collection vérifiée **`ACTIVE`**.
+
+**Endpoint de la collection** (à utiliser dès l'US 2.2) :
+`https://xxxxxxxxxxxx.us-west-2.aoss.amazonaws.com`
+
+**Critères d'acceptation (cahier des charges) :**
+
+| Critère | État |
+|---|---|
+| Infrastructure définie via AWS CDK ou Terraform | ✅ Fait (CDK) |
+| Index k-NN à la dimension Titan (1024) | ⏳ US 2.2 |
+| Data Access Policies (lecture/écriture) configurées | ✅ Fait |
+
+### 2. Concepts appris aujourd'hui (mémo à relire)
+
+- **IaC (Infrastructure as Code)** : décrire son infra en code (versionné, reproductible) au lieu de cliquer dans la console.
+- **AWS CDK** : écrire l'infra en Python, qui génère un plan **CloudFormation**. Cycle : `synth` (aperçu) → `bootstrap` (préparer le terrain, une fois) → `deploy` (construire) → `destroy` (nettoyer).
+- **App / Stack / Construct** : l'app contient des stacks (unités de déploiement) qui contiennent des constructs (briques de ressources). Constructs **L1** (`Cfn...`) = correspondance directe avec CloudFormation.
+- **OpenSearch Serverless** : AWS gère les serveurs ; on crée une **collection** (le conteneur) sans dimensionner de cluster.
+- **Collection vs Index vs Document** : l'armoire (collection) contient des tiroirs (index) qui contiennent des fiches (documents = chunks). Armoire créée en CDK, tiroirs créés plus tard en Python.
+- **Chiffrement au repos** : brouiller les données sur le disque ; illisible sans la clé.
+- **Réseau vs Identité** : la network policy = la porte (par où on arrive) ; la data access policy = le badge (qui a le droit de faire quoi). Deux contrôles séparés.
+- **IAM vs Data access policy** : IAM (`aoss:*`) = badge d'employé général ; data access policy = autorisation locale, gérée par OpenSearch, sur une collection précise. **Les deux sont nécessaires.**
+- **ARN** : l'adresse unique et officielle d'une ressource AWS. Le rôle SSO a la forme `role/AWSReservedSSO_DataScientist_...`.
+- **`.env` / `python-dotenv`** : sortir la config sensible du code ; `load_dotenv()` charge le fichier, `os.environ[...]` lit les valeurs. `.env` ignoré par Git, `.env.example` versionné.
+- **Dépendances CDK (`add_resource_dependency`)** : forcer l'ordre de création (les policies avant la collection).
+- **Bootstrap** : outillage technique réutilisable du CDK (bucket S3 + rôles), à ne pas confondre avec le bucket S3 des documents (Sprint 1).
+
+### 3. Prochaines étapes
+
+- [ ] **US 2.2** : créer l'index dans la collection, avec le **mapping k-NN** (champ `knn_vector` dimension 1024), en Python via le client `opensearch-py`.
+- [ ] **US 2.3** : indexer les chunks vectorisés (bulk insert).
+- [ ] **US 2.4** : tester la recherche sémantique (k-NN).
+
+---
+
+_« From zero to hero » — première infrastructure cloud déployée. 🚀_

@@ -170,3 +170,54 @@ Construite en 4 « briques », dans un dossier `infra/` séparé du code applica
 ---
 
 _« From zero to hero » — première infrastructure cloud déployée. 🚀_
+---
+
+## Sprint 2 — US 2.2 : Index + mapping k-NN (21/09/2026)
+
+### 1. Objectif et résultat
+
+Créer, **en Python** (client `opensearch-py`, pas en CDK), l'index dans la collection, avec un champ `knn_vector` de dimension 1024 (métrique **cosinus**) + les champs de métadonnées, puis vérifier le mapping. **✅ Fait et vérifié.**
+
+**Code produit (`src/indexation/`) :**
+- `client.py` — fabrique un client `opensearch-py` authentifié en **SigV4** (service **`aoss`**). Réutilisable pour toute la suite du Sprint 2.
+- `create_index.py` — définit le mapping (`CORPS_INDEX`) et crée l'index de façon **idempotente**.
+- `verify_index.py` — relit le mapping et effectue un contrôle automatique (knn_vector, 1024, cosinus).
+
+**Mapping retenu :** champ `embedding` en `knn_vector`, `dimension: 1024`, `method: hnsw`, `engine: nmslib`, `space_type: cosinesimil` (= cosinus), `parameters: {m: 16, ef_construction: 512}` ; métadonnées `texte` (text), `source` (keyword), `page` / `chunk_index` / `nb_tokens` (integer).
+
+### 2. Le gros bug de la journée : `403 authorization_exception` à la création de l'index
+
+**Symptôme :** la connexion et le test d'existence passaient, mais `indices.create` renvoyait `403 ... User does not have permissions for the requested resource`.
+
+**Démarche de diagnostic (élimination une à une) :**
+1. Signataire = `aoss` (pas `es`) → OK.
+2. Data access policy → couvrait bien `collection/...` ET `index/.../*` avec `aoss:CreateIndex` → OK.
+3. Network policy publique → OK.
+4. IAM du rôle → inline policy `Action:"*" Resource:"*"` (droit total) → `aoss:APIAccessAll` déjà présent → IAM hors de cause.
+5. Endpoint ↔ collection → correspondaient bien → OK.
+6. **ARN du rôle** → le vrai ARN du rôle SSO contient un **chemin** (`.../aws-reserved/sso.amazonaws.com/us-west-2/...`) que le `Principal` de la data access policy **n'avait pas**.
+
+**Cause racine :** dans la data access policy, le `Principal` était l'ARN du rôle **sans le chemin**. AOSS résout l'appelant vers son vrai rôle (avec chemin) et ne trouve pas de correspondance → 403. Pour un rôle SSO, il faut **l'ARN réel complet, avec le chemin**.
+
+**Correction :**
+- `infra/.env` → `DATA_ACCESS_ROLE_ARN` corrigé avec le chemin complet.
+- La data access policy déployée a été mise à jour via `aws opensearchserverless update-access-policy` (le `cdk deploy` était bloqué par un bucket de bootstrap manquant — voir hygiène ci-dessous).
+- Après ~1 min de propagation : **création de l'index réussie**.
+
+### 3. Concepts appris
+
+- **Plan de contrôle vs plan de données** : créer l'index / écrire / chercher relève du *plan de données* (exige `aoss:APIAccessAll` côté IAM), distinct des actions de *contrôle* (créer la collection, les policies).
+- **`es:` vs `aoss:`** : deux services AWS distincts (OpenSearch managé vs Serverless), aux permissions étanches. `es:*` ne donne aucun droit sur Serverless.
+- **ARN d'un rôle SSO** : il porte un chemin `aws-reserved/sso.amazonaws.com/<région>/` ; c'est l'ARN **complet** (avec chemin) qu'attend une data access policy AOSS.
+- **HNSW** : algorithme de recherche vectorielle approximative (graphe multi-couches « autoroutes → rues ») ; réglages `m` (voisins/nœud) et `ef_construction` (qualité à la construction).
+- **`update-access-policy`** : met à jour la data access policy en exigeant sa `policyVersion` courante (verrouillage optimiste).
+
+### 4. Points d'hygiène à régler plus tard
+
+- **Bucket de bootstrap CDK manquant** : `cdk deploy` échoue (`No bucket named cdk-hnb659fds-assets-...`) alors que `cdk bootstrap` dit « no changes ». Le bucket de staging a été supprimé hors CDK ; à recréer (re-bootstrap forcé) pour réaligner l'IaC.
+- **Drift CDK ↔ réalité** : la data access policy a été corrigée via CLI, pas via CDK. `infra/.env` est déjà aligné ; au prochain `cdk deploy` réussi, vérifier que CloudFormation se réaligne sans conflit de version.
+- **Fichiers temporaires à supprimer** : `aoss-apiaccess-policy.json`, `updated-data-access-policy.json` (racine du projet) et `pol.json` (dossier utilisateur).
+
+### 5. Prochaine étape
+
+- [ ] **US 2.3** : indexer les chunks vectorisés du Sprint 1 dans l'index (bulk insert).

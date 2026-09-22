@@ -9,9 +9,11 @@ python-docx==1.2.0       # Extraction du texte des fichiers Word (.docx) -> impo
 boto3==1.43.83           # SDK AWS : acces a S3 (et Bedrock plus tard)
 python-dotenv==1.2.3     # Chargement de la configuration depuis un fichier .env -> import dotenv
 
+# --- Sprint 2 / US 2.2 : base vectorielle OpenSearch ---
+opensearch-py==2.8.0     # Client Python pour Amazon OpenSearch Serverless (signe les requetes en SigV4)
+
 # --- Sprints suivants (a decommenter le moment venu) ---
 # langchain      # Orchestration du flux RAG
-# opensearch-py  # Client Python pour Amazon OpenSearch
 # fastapi        # API backend
 # uvicorn        # Serveur qui fait tourner FastAPI
 # streamlit      # Interface chatbot

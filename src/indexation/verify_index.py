@@ -44,6 +44,7 @@ def verifier_index(client, nom_index):
 
 if __name__ == "__main__":
     import os
+    import time
 
     from dotenv import load_dotenv
 
@@ -53,4 +54,14 @@ if __name__ == "__main__":
         os.getenv("AWS_REGION"),
         os.getenv("AWS_PROFILE"),
     )
-    verifier_index(client, os.getenv("INDEX_NAME", "smartovate-chunks"))
+    nom = os.getenv("INDEX_NAME", "smartovate-chunks")
+    verifier_index(client, nom)
+
+    # Nombre de documents indexes (on attend le refresh AOSS si besoin)
+    total = 0
+    for _ in range(12):            # jusqu'a ~60 s
+        total = client.count(index=nom)["count"]
+        if total > 0:
+            break
+        time.sleep(5)
+    print(f"\nDocuments presents dans l'index : {total}")

@@ -49,7 +49,7 @@ cdk deploy --profile smartovate      # deploiement sur AWS
 - [ ] **Sprint 2 : Base vectorielle OpenSearch**
   - [x] US 2.1 : provisionnement de la collection OpenSearch Serverless en CDK
   - [x] US 2.2 : creation de l'index + mapping k-NN (dimension 1024)
-  - [ ] US 2.3 : indexation des chunks vectorises (bulk insert)
+  - [x] US 2.3 : indexation des chunks vectorises (bulk insert)
   - [ ] US 2.4 : recherche semantique (k-NN)
 - [ ] Sprint 3 : Moteur RAG (retrieval + generation)
 - [ ] Sprint 4 : Interface chatbot, deploiement & documentation

@@ -221,3 +221,30 @@ Créer, **en Python** (client `opensearch-py`, pas en CDK), l'index dans la coll
 ### 5. Prochaine étape
 
 - [ ] **US 2.3** : indexer les chunks vectorisés du Sprint 1 dans l'index (bulk insert).
+
+---
+
+## Sprint 2 — US 2.3 : Indexation des chunks (bulk insert) (23/09/2026)
+
+### 1. Objectif et résultat
+
+Indexer les chunks vectorisés du Sprint 1 dans l'index k-NN `smartovate-chunks`, **en masse (bulk)**. **✅ Fait : 7 documents indexés et vérifiés.**
+
+**Code produit :**
+- `src/indexation/bulk_index.py` — flux complet : (1) produire les chunks via le pipeline du Sprint 1, (2) réinitialiser l'index (repartir à vide), (3) insérer en masse via `opensearchpy.helpers.bulk`, (4) vérifier le nombre de documents.
+- `src/indexation/verify_index.py` — enrichi : compte désormais les documents présents.
+
+### 2. Concepts appris
+
+- **Indexation en masse (bulk)** : regrouper N documents dans **une seule requête** plutôt qu'un appel par document → rapide, moins d'allers-retours, anti-timeout. Helper `helpers.bulk` : `chunk_size` (batching), `max_retries` + `initial_backoff` (réessais avec attente croissante = *backoff*), `raise_on_error=False` (on collecte les erreurs au lieu de tout arrêter).
+- **Pas d'`_id` personnalisé sur VECTORSEARCH** : AOSS interdit les identifiants de documents choisis sur ce type de collection (« Document ID is not supported »). Impossible donc de dédupliquer par `_id` → stratégie **« full re-index »** : supprimer + recréer l'index vide avant chaque indexation complète, pour éviter les doublons. S3 reste la **source de vérité** (l'index est jetable et reconstructible).
+- **Cohérence à terme / refresh AOSS** : un document inséré est écrit tout de suite mais ne devient **comptable/cherchable** qu'après le *refresh* (délai de quelques secondes à dizaines de secondes, géré par AOSS). → vérification par **polling** (interroger le compteur en boucle jusqu'au bon total), au lieu d'un `sleep` fixe.
+
+### 3. Pièges rencontrés & résolus
+
+- **Bucket S3 disparu** (`NoSuchBucket`) : le bucket `smartovate-rag-documents-mohamed` avait été supprimé par le ménage du compte sandbox (comme le bucket de bootstrap CDK à l'US 2.2). Corrigé en le recréant (`aws s3 mb`) puis en re-synchronisant les documents locaux (`aws s3 sync data/raw`). Les documents d'origine étaient conservés en local — la source de vérité était intacte.
+- **Compteur à 0 juste après l'indexation** : les 7 documents étaient bien insérés (bulk : 7 succès, 0 erreur), mais le comptage immédiat renvoyait 0 à cause du refresh AOSS. Corrigé en rendant la vérification **patiente** (polling avec délai, jusqu'à ~90 s).
+
+### 4. Prochaine étape
+
+- [ ] **US 2.4** : recherche sémantique (k-NN) sur l'index rempli.

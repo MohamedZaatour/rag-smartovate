@@ -284,3 +284,38 @@ La **recherche sémantique (retrieval)** appartient au **Sprint 3 (US 3.1)**, pa
 
 - [ ] **US 3.1** : recherche sémantique (retrieval k-NN) — question → vecteur Titan → Top-K chunks.
 - [ ] **US 3.2** : génération de la réponse (Bedrock / Claude 3) avec citations et garde-fou anti-hallucination.
+
+---
+
+## Sprint 3 — Étape 0 (prérequis) + US 3.1 : Recherche sémantique (24/09/2026)
+
+### 1. Étape 0 — Vérifications avant de coder
+
+Principe : inspecter le terrain avant d'écrire le moteur RAG.
+
+- **Base vectorielle vérifiée** : `verify_index` confirme l'index `smartovate-chunks` (knn_vector, dim 1024, cosinus) et **7 documents**. Un timeout réseau passager a été levé par un simple réessai (la collection était bien `ACTIVE` — vérifié via `batch-get-collection`).
+- **Accès à Claude sur Bedrock prouvé** : nouveau module `src/rag/` + `smoke_test_claude.py` (API **Converse**). Appel réussi, `usage` = 54 tokens.
+- **Décision de modèle (matière rapport)** : le cahier prévoyait **Claude 3 Haiku**, mais AWS l'a classé **Legacy** et en bloque l'accès (règle des 30 jours d'inactivité). Substitution **documentée** vers son équivalent actif **Claude Haiku 4.5** (`us.anthropic.claude-haiku-4-5-20251001-v1:0`), même rôle (rapide, économique). ID externalisé dans `.env` (`BEDROCK_LLM_MODEL_ID`, `BEDROCK_LLM_REGION`).
+
+### 2. US 3.1 — Recherche sémantique (Retrieval)
+
+Module `src/rag/retrieval.py` — fonction `rechercher_chunks(question, k=5)` :
+1. vectorise la question avec **le même** modèle Titan que les chunks (même espace vectoriel = distances valides) ;
+2. envoie une requête **k-NN** à OpenSearch sur le champ `embedding` (avec `_source` excluant `embedding` pour alléger la réponse) ;
+3. renvoie les Top-K chunks nettoyés `{score, texte, source, page, chunk_index}`, déjà triés du plus proche au moins proche.
+
+Testé sur 3 questions → passages pertinents remontés.
+
+### 3. Concepts appris
+
+- **Smoke test** : test minimal « est-ce que ça s'allume ? » avant de tester le détail.
+- **Foundation model vs inference profile** : le modèle (cerveau) vs l'aiguilleur qui route la requête. Claude s'appelle via un inference profile (préfixe `us.`).
+- **`us.` vs `global.`** : routage limité aux USA vs mondial → on garde `us.` (cohérence + maîtrise géographique).
+- **API Converse** : format **unifié** de Bedrock ; réponse toujours structurée pareil, renvoie l'`usage` (tokens → coûts).
+- **Modèle « Legacy »** : modèle en fin de vie, gelé par AWS.
+- **Score k-NN OpenSearch** : score transformé (plus haut = plus proche), **pas un pourcentage** ; resserré ici car corpus minuscule et homogène (1 seul document).
+- **Retrieval vs Génération** : le retrieval trouve les chunks bruts ; la génération (US 3.2) rédige la réponse claire et sourcée.
+
+### 4. Prochaine étape
+
+- [ ] **US 3.2** : génération de la réponse avec Claude (prompt = consignes + contexte + question) + garde-fous anti-hallucination (seuil de score, consignes « contexte uniquement / je ne sais pas », sources vérifiées).

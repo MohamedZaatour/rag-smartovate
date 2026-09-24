@@ -248,3 +248,39 @@ Indexer les chunks vectorisés du Sprint 1 dans l'index k-NN `smartovate-chunks`
 ### 4. Prochaine étape
 
 - [ ] **US 2.4** : recherche sémantique (k-NN) sur l'index rempli.
+
+---
+
+## 🏁 Clôture officielle du Sprint 2 (24/09/2026)
+
+### Alignement avec le cahier des charges
+
+Le cahier des charges découpe le Sprint 2 (« Mise en place de la Base Vectorielle ») en **2 US** :
+- **US 2.1 — Configuration d'Amazon OpenSearch Serverless** (infra IaC + index k-NN dimension Titan + Data Access Policies).
+- **US 2.2 — Indexation des documents vectorisés** (bulk insert).
+
+Notre découpe (plus fine) y correspond exactement :
+
+| Cahier des charges | Notre découpe |
+|---|---|
+| US 2.1 — Config Serverless (infra + index k-NN + policies) | US 2.1 (collection/policies) + US 2.2 (index + mapping) |
+| US 2.2 — Indexation (bulk) | US 2.3 |
+
+La **recherche sémantique (retrieval)** appartient au **Sprint 3 (US 3.1)**, pas au Sprint 2.
+
+### Bilan du Sprint 2 — livré
+
+- **Base vectorielle opérationnelle** : collection OpenSearch Serverless `smartovate-rag-mohamed` (type VECTORSEARCH), provisionnée en **AWS CDK** (encryption + network + data access policies).
+- **Index k-NN** `smartovate-chunks` : champ `embedding` en `knn_vector`, **dimension 1024**, métrique **cosinus** (nmslib / HNSW) + 5 champs de métadonnées.
+- **Indexation en masse** : pipeline Sprint 1 → *full re-index* → **bulk insert** (`helpers.bulk`). **7 documents** indexés et vérifiés.
+- **Code** : module `src/indexation/` (`client.py`, `create_index.py`, `verify_index.py`, `bulk_index.py`), documenté et versionné sur GitHub.
+
+### Pièges rencontrés & résolus (matière pour le rapport)
+
+- **US 2.2** — `403` à la création d'index : l'ARN du rôle SSO manquait son **chemin** (`aws-reserved/sso.amazonaws.com/...`) dans la data access policy. Notions clés : **plan de contrôle vs plan de données**, et `es:` vs `aoss:`.
+- **US 2.3** — bucket S3 supprimé par le ménage du compte sandbox (`NoSuchBucket`) → recréation + re-sync ; et compteur à 0 après indexation → **refresh AOSS** (cohérence à terme) → vérification par **polling**.
+
+### Prochaine étape — Sprint 3 (Moteur RAG)
+
+- [ ] **US 3.1** : recherche sémantique (retrieval k-NN) — question → vecteur Titan → Top-K chunks.
+- [ ] **US 3.2** : génération de la réponse (Bedrock / Claude 3) avec citations et garde-fou anti-hallucination.

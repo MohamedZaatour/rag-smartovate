@@ -46,12 +46,14 @@ cdk deploy --profile smartovate      # deploiement sur AWS
 - [x] **Sprint 1 : Ingestion & traitement des donnees** (US 1.1 + US 1.2)
   - [x] US 1.1 : extraction & nettoyage du texte (PDF, Word) depuis S3
   - [x] US 1.2 : chunking + embeddings (Titan, dimension 1024)
-- [ ] **Sprint 2 : Base vectorielle OpenSearch**
+- [x] **Sprint 2 : Base vectorielle OpenSearch** — TERMINÉ
   - [x] US 2.1 : provisionnement de la collection OpenSearch Serverless en CDK
   - [x] US 2.2 : creation de l'index + mapping k-NN (dimension 1024)
   - [x] US 2.3 : indexation des chunks vectorises (bulk insert)
-  - [ ] US 2.4 : recherche semantique (k-NN)
-- [ ] Sprint 3 : Moteur RAG (retrieval + generation)
+  - > Correspondance cahier des charges : US 2.1 du cahier (config Serverless) = nos US 2.1 + 2.2 ; US 2.2 du cahier (indexation) = notre US 2.3. La recherche semantique est US 3.1 (Sprint 3).
+- [ ] **Sprint 3 : Moteur RAG**
+  - [ ] US 3.1 : recherche semantique (retrieval k-NN)
+  - [ ] US 3.2 : generation de la reponse (Bedrock / Claude 3)
 - [ ] Sprint 4 : Interface chatbot, deploiement & documentation
 
 ---

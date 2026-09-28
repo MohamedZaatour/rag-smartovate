@@ -53,9 +53,9 @@ cdk deploy --profile smartovate      # deploiement sur AWS
   - [x] US 2.2 : creation de l'index + mapping k-NN (dimension 1024)
   - [x] US 2.3 : indexation des chunks vectorises (bulk insert)
   - > Correspondance cahier des charges : US 2.1 du cahier (config Serverless) = nos US 2.1 + 2.2 ; US 2.2 du cahier (indexation) = notre US 2.3. La recherche semantique est US 3.1 (Sprint 3).
-- [ ] **Sprint 3 : Moteur RAG**
+- [x] **Sprint 3 : Moteur RAG** — code termine (US 3.1 + US 3.2)
   - [x] US 3.1 : recherche semantique (retrieval k-NN) — question -> vecteur Titan -> Top-K chunks
-  - [ ] US 3.2 : generation de la reponse (Bedrock / Claude Haiku 4.5) + garde-fous anti-hallucination
+  - [x] US 3.2 : generation de la reponse (Claude Haiku 4.5) + garde-fous anti-hallucination (seuil + consignes + sources)
   - > Note modele : le cahier prevoyait Claude 3, classe "Legacy" par AWS (acces bloque). Substitution documentee vers Claude Haiku 4.5 (equivalent actif, meme role). ID externalise dans `.env`.
 - [ ] Sprint 4 : Interface chatbot, deploiement & documentation
 

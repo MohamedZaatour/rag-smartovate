@@ -319,3 +319,75 @@ Testé sur 3 questions → passages pertinents remontés.
 ### 4. Prochaine étape
 
 - [ ] **US 3.2** : génération de la réponse avec Claude (prompt = consignes + contexte + question) + garde-fous anti-hallucination (seuil de score, consignes « contexte uniquement / je ne sais pas », sources vérifiées).
+
+---
+
+## Sprint 3 — US 3.2 : Generation de la reponse (28/09/2026)
+
+### 1. Objectif et resultat
+
+Transformer les chunks bruts (US 3.1) en une reponse redigee, claire et sourcee, avec garde-fous anti-hallucination. **US 3.2 terminee**, testee de bout en bout sur les 2 cas (question pertinente + question hors sujet).
+
+### 2. Code produit (module src/rag/, 3 briques)
+
+- **prompt.py** (brique 1) : `construire_prompt(question, chunks)` -> dict {systeme, utilisateur}. Consignes strictes + contexte balise (<document source= page=>) + question. 100% texte, testable sans AWS.
+- **generation.py** (brique 2) : `generer_reponse(prompt)` -> appelle Claude via l'API **Converse** (system + messages, temperature=0, maxTokens=800). Renvoie {reponse, tokens, arret}.
+- **pipeline.py** (brique 3) : `repondre(question)` -> **orchestrateur**, porte d'entree UNIQUE du moteur RAG. Enchaine retrieval -> seuil -> prompt -> generation. Renvoie {reponse, sources, tokens, appel_llm}.
+
+### 3. Decisions & concepts
+
+- **Modele** : Claude Haiku 4.5 via inference profile `us.`, appele en **Converse** (format unifie Bedrock ; system separe des messages ; renvoie l'usage tokens).
+- **Anti-hallucination = defense en profondeur (4 couches)** :
+  1. temperature = 0 (fidelite, pas d'invention) ;
+  2. consignes du prompt (contexte uniquement / sinon "Je ne trouve pas" / cite ses sources) ;
+  3. sources construites a partir des **chunks reels** (pas du texte de Claude) ;
+  4. seuil de score `SCORE_MIN` (.env, defaut 0.5) : sous le seuil, reponse d'absence SANS appeler Claude (economie + zero risque).
+- **Score OpenSearch** : score transforme du cosinus (0.5 ~ aucun rapport, ->1 = proche), ce n'est PAS un pourcentage.
+
+### 4. Tests reels
+
+- « Quelle base vectorielle est utilisee ? » -> "Amazon OpenSearch Serverless" + [Source : ..., p.2] ; appel_llm=True.
+- « Quelle est la capitale de l'Australie ? » -> "Je ne trouve pas cette information..." ; meilleur score 0.5275 (>= 0.5) donc le seuil (couche 4) n'a pas bloque -> c'est la couche 2 (prompt) qui a refuse. Illustration concrete de la defense en profondeur.
+- Observation (rapport) : sur ce corpus minuscule et homogene, le seuil 0.5 ne coupe pas la question hors sujet (0.5275) ; a calibrer sur la vraie base (un seuil ~0.55 la couperait ici, au risque de faux refus -> valider sur donnees reelles).
+
+### 5. Prochaine etape — cloture du Sprint 3
+
+- [ ] Tests automatises (pytest, avec mocks : prompt sans AWS, retrieval/generation mockes).
+- [ ] Doc finale + support de presentation du Sprint 3.
+- [ ] (option) amorcer l'API FastAPI (transition vers le Sprint 4).
+
+---
+
+## Sprint 3 — Pistes d'amelioration & limites connues (28/09/2026)
+
+Section "recul critique" pour le rapport / la soutenance : ce que le systeme fait
+bien et comment le faire evoluer. Aucun de ces points n'est un bug -> ce sont des
+choix assumes ou des ameliorations a calibrer sur la vraie base documentaire.
+
+### Garde-fou & pertinence
+- **Seuil global vs filtrage par chunk** : le garde-fou actuel teste seulement le
+  MEILLEUR score (decision globale "faut-il repondre ?"). Les chunks faibles partent
+  quand meme a Claude. Evolution possible : filtrer chunk par chunk (garder les
+  chunks dont score >= SCORE_MIN ; s'il n'en reste aucun -> "Je ne trouve pas").
+  Cela ferait le go/no-go ET le nettoyage du contexte en une logique.
+  A calibrer sur corpus reel : sur le corpus de test, tous les scores sont entre
+  0.5 et 0.63 -> un filtrage par chunk jetterait des passages utiles.
+- **Calibration de SCORE_MIN** : fixe a 0.5 provisoirement. Sur corpus homogene, ne
+  coupe pas toujours le hors-sujet (ex. 0.5275) -> c'est la couche 2 (consignes du
+  prompt) qui rattrape. A re-regler sur la vraie base (scores mieux etales).
+- **Reranking (avance)** : re-classer les Top-K avec un modele plus precis
+  (cross-encoder) avant de les envoyer a Claude, pour affiner l'ordre et la pertinence.
+
+### Generation
+- **maxTokens = 800** : si stopReason = "max_tokens", la reponse a ete coupee ->
+  surveiller et augmenter au besoin pour les questions complexes.
+- **Cout** : le contexte (les chunks envoyes) domine les tokens d'entree. Leviers si
+  le cout devient un enjeu : reduire k, ou reduire la taille des chunks.
+
+### Corpus de test
+- Corpus minuscule (2 documents, 7 chunks) et homogene -> scores resserres,
+  evaluation du retrieval peu representative. A refaire sur la vraie base Smartovate.
+
+### Vers le Sprint 4
+- **Historique multi-tours** : Converse accepte une liste de messages
+  (user/assistant) -> le chatbot pourra se souvenir des questions precedentes.

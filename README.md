@@ -56,6 +56,7 @@ cdk deploy --profile smartovate      # deploiement sur AWS
 - [x] **Sprint 3 : Moteur RAG** — code termine (US 3.1 + US 3.2)
   - [x] US 3.1 : recherche semantique (retrieval k-NN) — question -> vecteur Titan -> Top-K chunks
   - [x] US 3.2 : generation de la reponse (Claude Haiku 4.5) + garde-fous anti-hallucination (seuil + consignes + sources)
+  - [x] Tests automatises (pytest) : 26 tests verts (15 Sprint 1 + 11 Sprint 3)
   - > Note modele : le cahier prevoyait Claude 3, classe "Legacy" par AWS (acces bloque). Substitution documentee vers Claude Haiku 4.5 (equivalent actif, meme role). ID externalise dans `.env`.
 - [ ] Sprint 4 : Interface chatbot, deploiement & documentation
 

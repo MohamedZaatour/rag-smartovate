@@ -391,3 +391,36 @@ choix assumes ou des ameliorations a calibrer sur la vraie base documentaire.
 ### Vers le Sprint 4
 - **Historique multi-tours** : Converse accepte une liste de messages
   (user/assistant) -> le chatbot pourra se souvenir des questions precedentes.
+
+---
+
+## Sprint 3 — Tests automatises (30/09/2026)
+
+### 1. Objectif
+Filet de securite (non-regression) : rejouer toute la logique du moteur RAG en
+UNE commande (pytest), sans appeler AWS. **26 tests verts** (15 anciens + 11 nouveaux),
+executes en ~1.7 s.
+
+### 2. Concept cle : le mock (doublure)
+Les fonctions du Sprint 3 appellent AWS (Titan, OpenSearch, Claude). Les appeler dans
+les tests serait lent, payant, dependant du reseau/SSO et non reproductible. On remplace
+donc AWS par une DOUBLURE (mock) qui imite ses reponses. Outil pytest : `monkeypatch`
+(remplace temporairement une fonction, LA OU elle est utilisee). Deux usages du mock :
+(a) DONNER une fausse reponse (tester ce que le code lit) ; (b) ESPIONNER l'appel
+(tester ce que le code envoie).
+
+### 3. Fichiers de tests (module rag/)
+- **test_prompt.py** (4) : structure du prompt ; balises source/page ; nom de fichier
+  sans URI S3 ; question presente. Aucun mock (pur texte).
+- **test_retrieval.py** (2) : transformation de la reponse OpenSearch en chunks propres ;
+  k bien transmis a la requete (espion).
+- **test_generation.py** (2) : extraction des champs de la reponse Converse ; prompt bien
+  place (system/messages) + temperature=0 (espion).
+- **test_pipeline.py** (3) : SOUS le seuil -> pas d'appel Claude (garde-fou couche 4) ;
+  AU-DESSUS -> Claude appele + sources construites ; aucun chunk -> reponse d'absence.
+
+### 4. Resultat
+`python -m pytest -v` -> **26 passed**. Le code du Sprint 3 est termine ET couvert par des tests.
+
+### 5. Prochaine etape
+- [ ] Bilan / cloture du Sprint 3 (journal) + support de presentation (.pptx).

@@ -6,17 +6,20 @@
 # --- Sprint 1 : Ingestion & traitement des documents ---
 pymupdf==1.28.2          # Extraction du texte des PDF (s'importe avec : import pymupdf)
 python-docx==1.2.0       # Extraction du texte des fichiers Word (.docx) -> import docx
-boto3==1.43.83           # SDK AWS : acces a S3 (et Bedrock plus tard)
+boto3==1.43.83           # SDK AWS : acces a S3 (et Bedrock)
 python-dotenv==1.2.3     # Chargement de la configuration depuis un fichier .env -> import dotenv
 
 # --- Sprint 2 / US 2.2 : base vectorielle OpenSearch ---
-opensearch-py==2.8.0     # Client Python pour Amazon OpenSearch Serverless (signe les requetes en SigV4)
+opensearch-py==2.8.0     # Client Python pour Amazon OpenSearch Serverless (SigV4)
+
+# --- Sprint 4 : API backend + interface web ---
+fastapi>=0.115           # API backend : expose le moteur RAG en HTTP
+uvicorn[standard]>=0.30  # serveur ASGI qui fait tourner FastAPI
+streamlit>=1.38          # interface web (chatbot)
+requests>=2.32           # appels HTTP de Streamlit vers l'API
 
 # --- Sprints suivants (a decommenter le moment venu) ---
 # langchain      # Orchestration du flux RAG
-# fastapi        # API backend
-# uvicorn        # Serveur qui fait tourner FastAPI
-# streamlit      # Interface chatbot
 
 # --- Outils de developpement (tests) ---
 pytest>=8.0              # tests automatiques : lancer avec la commande "pytest"

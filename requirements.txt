@@ -26,3 +26,4 @@ pytest>=8.0              # tests automatiques : lancer avec la commande "pytest"
 
 # --- Sprint 1 / US 1.2 : decoupage (chunking) ---
 tiktoken>=0.7            # comptage/decoupage du texte en tokens
+markdown>=3.5             # convertit le Markdown des reponses en HTML (bulles stylees)

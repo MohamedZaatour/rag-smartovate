@@ -13,6 +13,7 @@ import re
 import uuid
 
 import markdown as md
+import requests
 import streamlit as st
 
 from api_client import api_en_ligne, poser_question
@@ -378,6 +379,7 @@ if question:
     attente = st.empty()
     with attente:
         indicateur_chargement()
+    erreur = None
     try:
         resultat = poser_question(question)
         conv["messages"].append({
@@ -386,12 +388,20 @@ if question:
             "sources": resultat.get("sources", []),
             "appel_llm": resultat.get("appel_llm", True),
         })
-    except Exception:
-        conv["messages"].append({
-            "role": "assistant",
-            "content": "Impossible de joindre l'API. Vérifiez que le serveur (uvicorn) "
-                       "est lancé, puis réessayez.",
-            "erreur": True,
-        })
+    # L'ordre compte : un Timeout est aussi une ConnectionError -> on le teste d'abord.
+    except requests.exceptions.Timeout:
+        erreur = ("L'API met trop de temps à répondre (délai dépassé). "
+                  "Regardez le terminal uvicorn pour voir où elle bloque.")
+    except requests.exceptions.ConnectionError:
+        erreur = ("API injoignable. Vérifiez que le serveur (uvicorn) est lancé, "
+                  "puis réessayez.")
+    except requests.exceptions.HTTPError as e:
+        code = e.response.status_code if e.response is not None else "?"
+        erreur = (f"L'API a renvoyé une erreur (code {code}). Vérifiez votre session AWS "
+                  f"(aws sso login) et le message d'erreur dans le terminal uvicorn.")
+    except Exception as e:                       # noqa: BLE001
+        erreur = f"Erreur inattendue : {e}"
+    if erreur:
+        conv["messages"].append({"role": "assistant", "content": erreur, "erreur": True})
     # On relance le script : la barre laterale (titre) et l'historique se mettent a jour.
     st.rerun()

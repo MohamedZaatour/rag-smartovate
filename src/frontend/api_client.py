@@ -13,8 +13,15 @@ load_dotenv()
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
 
-def poser_question(question, k=5, timeout=60):
-    """Envoie la question a l'API (POST /ask) et renvoie le resultat (dict)."""
+def poser_question(question, k=5, timeout=120):
+    """Envoie la question a l'API (POST /ask) et renvoie le resultat (dict).
+
+    timeout=120 : marge pour la recherche + la generation (Claude).
+    Erreurs possibles (gerees par l'interface) :
+      - requests.Timeout         -> l'API met trop de temps a repondre
+      - requests.ConnectionError -> l'API est injoignable (uvicorn arrete)
+      - requests.HTTPError       -> l'API a repondu par une erreur (ex. 500)
+    """
     reponse = requests.post(
         f"{API_URL}/ask",
         json={"question": question, "k": k},

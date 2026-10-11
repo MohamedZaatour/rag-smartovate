@@ -76,3 +76,27 @@ def test_aucun_chunk_ne_appelle_pas_claude(monkeypatch):
     assert res["appel_llm"] is False
     assert res["reponse"] == pipeline.MESSAGE_ABSENCE
     assert appels["claude"] is False
+
+
+def test_claude_ne_trouve_pas_masque_les_sources(monkeypatch):
+    """Claude appele mais repond "Je ne trouve pas..." -> aucune source affichee."""
+    monkeypatch.setenv("SCORE_MIN", "0.5")
+
+    # Score AU-DESSUS du seuil -> Claude sera bien appele.
+    faux_chunks = [{"score": 0.53, "texte": "Cahier des charges RAG.",
+                    "source": "s3://b/exemple_cahier_des_charges.pdf",
+                    "page": 1, "chunk_index": 0}]
+    monkeypatch.setattr(pipeline, "rechercher_chunks", lambda question, k=5: faux_chunks)
+
+    # Claude repond la phrase d'absence SUIVIE d'une explication (cas reel).
+    reponse_claude = (pipeline.MESSAGE_ABSENCE
+                      + "\n\nCette question ne concerne pas Smartovate.")
+    monkeypatch.setattr(pipeline, "generer_reponse", lambda prompt: {
+        "reponse": reponse_claude, "tokens": {"totalTokens": 40}, "arret": "end_turn",
+    })
+
+    res = pipeline.repondre("Qui a gagne la coupe du monde en 2026 ?")
+
+    assert res["appel_llm"] is True          # Claude a bien ete appele
+    assert res["reponse"] == reponse_claude  # sa reponse est conservee telle quelle
+    assert res["sources"] == []              # mais aucune source n'est affichee

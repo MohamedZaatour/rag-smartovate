@@ -16,7 +16,9 @@ from rag.generation import generer_reponse
 from rag.prompt import construire_prompt
 from rag.retrieval import rechercher_chunks
 
-# Message unique quand l'info n'est pas disponible (coherent avec le prompt).
+# Message unique quand l'info n'est pas disponible.
+# ATTENTION : doit rester IDENTIQUE a la phrase imposee a Claude dans
+# rag/prompt.py (regle 3). Sinon _est_absence() ne la reconnaitra plus.
 MESSAGE_ABSENCE = "Je ne trouve pas cette information dans la base documentaire."
 
 # Seuil de pertinence par defaut (surcharge par .env). En dessous, on ne
@@ -35,6 +37,16 @@ def _sources_depuis_chunks(chunks):
             "score": round(c.get("score", 0), 4),
         })
     return sources
+
+
+def _est_absence(texte):
+    """True si la reponse de Claude COMMENCE par la phrase d'absence.
+
+    "Commence par" (et non "est egale a") : Claude ajoute parfois une
+    explication apres la phrase. rstrip(".") tolere un point final manquant.
+    """
+    debut = MESSAGE_ABSENCE.rstrip(".")
+    return texte.strip().startswith(debut)
 
 
 def repondre(question, k=5):
@@ -72,9 +84,16 @@ def repondre(question, k=5):
     resultat = generer_reponse(prompt)
     durees["generation"] = round(time.perf_counter() - debut, 2)
 
+    # [5] Sources : si Claude dit qu'il ne trouve pas, AUCUN chunk n'a servi
+    #     -> on n'affiche pas de sources (sinon l'utilisateur serait trompe).
+    if _est_absence(resultat["reponse"]):
+        sources = []
+    else:
+        sources = _sources_depuis_chunks(chunks)
+
     return {
         "reponse": resultat["reponse"],
-        "sources": _sources_depuis_chunks(chunks),
+        "sources": sources,
         "tokens": resultat["tokens"],
         "appel_llm": True,
         "durees": durees,

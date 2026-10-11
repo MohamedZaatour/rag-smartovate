@@ -13,7 +13,10 @@ Amazon OpenSearch Serverless. Infrastructure en IaC via AWS CDK.
 ├── src/
 │   ├── ingestion/     # Sprint 1 : extraction, nettoyage, chunking, embeddings
 │   ├── indexation/    # Sprint 2 : index k-NN OpenSearch + indexation (bulk)
-│   └── rag/           # Sprint 3 : recherche semantique + generation
+│   ├── rag/           # Sprint 3 : recherche semantique + generation
+│   ├── api/           # Sprint 4 : API backend FastAPI (/ask, /health)
+│   ├── frontend/      # Sprint 4 : interface chatbot Streamlit
+│   └── .streamlit/    # Sprint 4 : theme de l'interface
 ├── infra/             # Sprint 2 : infrastructure AWS en CDK (OpenSearch Serverless)
 ├── data/
 │   ├── raw/           # Documents bruts de test (PDF, Word) - local uniquement
@@ -43,6 +46,30 @@ cdk deploy --profile smartovate      # deploiement sur AWS
 > La configuration de l'infra (nom de collection, ARN du role) se trouve dans
 > `infra/.env` (non versionne). Voir `infra/.env.example` pour le modele.
 
+## Lancer le chatbot en local
+
+Prerequis : environnement `rag-smartovate` active, fichier `.env` rempli
+(voir `.env.example`) et session AWS ouverte.
+
+```bash
+aws sso login --profile smartovate
+
+# Terminal 1 - l'API (depuis src/)
+uvicorn api.main:app --reload        # doc interactive : http://localhost:8000/docs
+
+# Terminal 2 - l'interface (depuis src/)
+streamlit run frontend/app.py        # ouvre http://localhost:8501
+```
+
+> La 1re question apres le demarrage de l'API est plus lente (creation des clients AWS) ;
+> les suivantes repondent en quelques secondes.
+
+### Tests
+
+```bash
+pytest          # depuis 02-Developpement/ - aucun appel AWS (doublures)
+```
+
 ## Avancement
 
 - [x] **Sprint 1 : Ingestion & traitement des donnees** (US 1.1 + US 1.2)
@@ -56,9 +83,14 @@ cdk deploy --profile smartovate      # deploiement sur AWS
 - [x] **Sprint 3 : Moteur RAG** — code termine (US 3.1 + US 3.2)
   - [x] US 3.1 : recherche semantique (retrieval k-NN) — question -> vecteur Titan -> Top-K chunks
   - [x] US 3.2 : generation de la reponse (Claude Haiku 4.5) + garde-fous anti-hallucination (seuil + consignes + sources)
-  - [x] Tests automatises (pytest) : 26 tests verts (15 Sprint 1 + 11 Sprint 3)
+  - [x] Tests automatises (pytest) : 26 tests verts (15 Sprint 1 + 11 Sprint 3) — 27 depuis le Sprint 4
   - > Note modele : le cahier prevoyait Claude 3, classe "Legacy" par AWS (acces bloque). Substitution documentee vers Claude Haiku 4.5 (equivalent actif, meme role). ID externalise dans `.env`.
-- [ ] Sprint 4 : Interface chatbot, deploiement & documentation
+- [ ] **Sprint 4 : Interface chatbot, deploiement & documentation** — en cours
+  - [x] US 4.1 : API FastAPI (`/ask`, `/health`) + interface chatbot Streamlit
+    (historique de session, conversations, sources affichees)
+  - [x] Performance : clients AWS reutilises (`lru_cache`) -> 2 a 5 s par question
+  - [x] Garde-fou : sources masquees quand l'information n'est pas dans la base
+  - [ ] US 4.2 : conteneurisation Docker, deploiement App Runner, README complet, PEP8
 
 ---
 _Projet de stage - Mohamed Zaatour_

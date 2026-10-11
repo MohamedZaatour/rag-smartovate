@@ -424,3 +424,131 @@ donc AWS par une DOUBLURE (mock) qui imite ses reponses. Outil pytest : `monkeyp
 
 ### 5. Prochaine etape
 - [ ] Bilan / cloture du Sprint 3 (journal) + support de presentation (.pptx).
+
+---
+
+## Sprint 4 — US 4.1 : API backend FastAPI (06/10/2026)
+
+### 1. Objectif et résultat
+« Emballer » le moteur RAG du Sprint 3 derrière une **URL HTTP**, pour qu'une interface
+(Streamlit aujourd'hui, React demain) puisse l'interroger. L'API ne réinvente rien :
+elle reçoit une question, appelle `repondre()` et renvoie le résultat en JSON.
+**API fonctionnelle**, testée via la documentation interactive Swagger (`/docs`).
+
+### 2. Code produit (module `src/api/`)
+- **models.py** : contrats d'échange Pydantic — `Question` (question, k=5),
+  `Source` (source, page, score), `Reponse` (reponse, sources, appel_llm).
+- **main.py** :
+  - `GET /health` → `{"status": "ok"}` (« es-tu en vie ? », utile au déploiement) ;
+  - `POST /ask` → appelle `repondre()` ; `response_model=Reponse` garantit la forme de la sortie ;
+  - middleware **CORS** (utile seulement pour un futur client navigateur type React).
+- Lancement (depuis `src/`) : `uvicorn api.main:app --reload`.
+
+### 3. Concepts appris
+- **API / endpoint** : une « porte » HTTP (méthode + chemin) qui expose une fonction.
+- **Pydantic** : valide automatiquement les données entrantes/sortantes (erreur 422 si invalide).
+- **uvicorn** : le serveur (ASGI) qui fait tourner l'application FastAPI.
+- **Décorateur** (`@app.get`, `@app.post`) : associe une fonction Python à une route.
+- **CORS** : règle de sécurité des **navigateurs** ; ne concerne pas Streamlit (appel serveur → serveur).
+- **Codes HTTP** : 200 OK, 404 route inexistante (ex. `/` ou `/favicon.ico`), 422 données invalides, 500 erreur serveur.
+
+---
+
+## Sprint 4 — US 4.1 : Interface chatbot Streamlit (09/10/2026)
+
+### 1. Objectif et résultat
+Interface web conversationnelle connectée à l'API, conforme au cahier (US 4.1) :
+historique de la session, réponse de l'IA et sources affichées. **Interface terminée et validée.**
+
+### 2. Code produit (module `src/frontend/` + `src/.streamlit/`)
+- **api_client.py** : `poser_question()` (POST `/ask`) et `api_en_ligne()` (GET `/health`).
+  L'URL de l'API vient de `.env` (`API_URL`) → changera au déploiement sans toucher au code.
+- **app.py** : interface complète —
+  - barre latérale : « Nouvelle conversation » + conversations récentes ;
+  - en-tête « Smartovate AI Assistant » + badge d'état de l'API ;
+  - écran d'accueil avec 3 suggestions de questions ;
+  - bulles utilisateur (droite) / assistant (gauche), rendu Markdown (tableaux, code, listes) ;
+  - bloc repliable « Sources utilisées » (document, page, score) ;
+  - indicateur de chargement pendant l'appel.
+- **.streamlit/config.toml** : thème clair (palette navy / gris clair / accent turquoise).
+- Lancement (depuis `src/`) : `streamlit run frontend/app.py` (l'API doit tourner en parallèle).
+
+### 3. Concepts appris
+- **Modèle d'exécution Streamlit** : le script entier est **réexécuté** à chaque interaction.
+- **`st.session_state`** : la mémoire qui survit aux réexécutions (historique, conversations).
+- **`st.rerun()`** : relancer le script après le traitement pour rafraîchir toute la page.
+- **Personnalisation CSS** via les `data-testid` des composants Streamlit.
+
+### 4. Pièges rencontrés & résolus
+- Titre de conversation « Nouvelle conversation » en double et cartes d'accueil persistantes :
+  la barre latérale était dessinée **avant** la mise à jour du titre → lire la saisie **tôt**,
+  traiter, puis `st.rerun()`.
+- `ModuleNotFoundError: markdown` → `pip install markdown` dans l'environnement `rag-smartovate`.
+
+---
+
+## Sprint 4 — Diagnostic de la lenteur du chatbot + garde-fou des sources (11/10/2026)
+
+### 1. Le symptôme
+Le chatbot affichait « délai dépassé » : une question prenait de **30 à 180 s** via l'API,
+alors que le même moteur répondait en quelques secondes en ligne de commande.
+Lien avec le cahier des charges : **Bug 2 « Lenteur / Timeouts »** (Sprint 4).
+
+### 2. La démarche : mesurer avant de corriger
+| Étape | Outil | Ce qu'on a appris |
+|---|---|---|
+| 1 | Messages d'erreur distincts dans l'interface | c'est un **délai dépassé**, pas une API arrêtée |
+| 2 | Logs dans l'API (`question recue` / `reponse prete en`) | une question = **91,5 s** |
+| 3 | `faulthandler` (pile d'appels affichée toutes les 20 s) | le programme attend en **ouvrant les connexions réseau** (DNS, TCP), pas pendant le travail d'AWS |
+| 4 | Test sans `--reload` | fausse piste (écarts dus au hasard) |
+| 5 | Script de test réseau (temporaire) | certaines adresses AWS **ne répondent jamais** (abandon après ~21 s) sur la connexion utilisée |
+| 6 | Changement de réseau | toutes les connexions < 0,5 s → **cause n°1 confirmée** |
+| 7 | Chronomètre par étape (`durees`) | la **recherche** prend encore ~6,5 s au lieu de ~1 s |
+| 8 | `@lru_cache` sur les clients AWS | recherche à **0,8 s** → **cause n°2 corrigée** |
+
+### 3. Les deux causes
+1. **Réseau** : pertes de paquets entre la connexion internet locale et AWS (Oregon).
+   Pas un problème de code ; n'existera pas une fois l'API déployée dans AWS (App Runner).
+2. **Code** : les clients AWS (sessions, identifiants SSO, connexions HTTPS) étaient **recréés
+   à chaque question**. Sans impact dans les scripts des Sprints 1–3 (exécutés une fois),
+   mais coûteux dans une API qui reste allumée.
+
+### 4. Corrections apportées
+- `rag/retrieval.py` : `_clients()` décorée par `@lru_cache` → clients Bedrock + OpenSearch créés
+  **une seule fois** puis réutilisés. Idem `_client_claude()` dans `rag/generation.py`.
+- `rag/pipeline.py` : `repondre()` renvoie `durees` (temps de recherche / génération) ;
+  l'API l'affiche dans ses logs (utile aussi en production).
+- `api/main.py` : diagnostic temporaire (`faulthandler`) retiré après résolution.
+- **Résultat** : de 91–180 s à **2–5 s** par question. Seule la 1re question après le
+  démarrage reste plus lente (**démarrage à froid** : création des clients).
+
+### 5. Régression détectée par les tests (et corrigée)
+Le cache gardait la **doublure** (faux client) du test précédent → 2 tests en échec.
+Correction : `tests/conftest.py` avec une fixture `autouse` qui appelle `cache_clear()`
+avant et après chaque test. Leçon : **toujours relancer toute la suite (`pytest`) avant un commit.**
+
+### 6. Garde-fou : masquer les sources quand Claude ne trouve pas
+- Constat : « Qui a gagné la coupe du monde en 2026 ? » → Claude répond correctement
+  « Je ne trouve pas… » (**pas d'hallucination** : le prompt, couche 2, a fait son travail),
+  mais l'interface affichait « Sources utilisées (5) » → trompeur.
+- Pourquoi le seuil n'a pas filtré : score OpenSearch = 1 / (2 − cosinus) → **0,5 = cosinus 0
+  = aucun rapport**. `SCORE_MIN=0.5` ne bloque donc quasiment rien.
+- Option écartée : calibrer le seuil avec une liste de questions de test → dépend des documents
+  de la base (à refaire à chaque changement de corpus).
+- Option retenue (indépendante des documents) : `_est_absence()` dans `pipeline.py` — si la réponse
+  **commence par** la phrase d'absence, `sources = []`. `appel_llm` reste `True`.
+  ⚠️ `MESSAGE_ABSENCE` doit rester identique à la phrase imposée dans `prompt.py`.
+- Nouveau test : `test_claude_ne_trouve_pas_masque_les_sources` → **27 tests verts**.
+
+### 7. Concepts appris
+- **`faulthandler`** : « photo » de la pile d'appels d'un programme bloqué.
+- **DNS** (nom → adresse IP), **connexion TCP**, délai d'abandon Windows (~21 s), **perte de paquets**.
+- **`uvicorn --reload`** : un processus surveillant + un processus « ouvrier » relancé à chaque
+  modification ; pratique en développement, jamais en production.
+- **`time.perf_counter()`** : chronomètre précis pour mesurer chaque étape.
+- **`@lru_cache`** : mémorise le résultat d'une fonction ; **démarrage à froid**.
+- **Fixture pytest** (`conftest.py`, `autouse=True`) : code exécuté autour de chaque test.
+- **Défense en profondeur** : quand une couche laisse passer (seuil), la suivante rattrape (prompt).
+
+### 8. Prochaine étape
+- [ ] **US 4.2** : Docker (concepts puis Dockerfile), déploiement sur App Runner, README complet, PEP8.

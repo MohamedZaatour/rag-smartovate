@@ -6,6 +6,7 @@
 # ============================================================
 
 import os
+from functools import lru_cache
 
 from dotenv import load_dotenv
 
@@ -17,6 +18,23 @@ from ingestion.embeddings import creer_client_bedrock, generer_embedding  # Spri
 K_PAR_DEFAUT = 5
 
 
+# Sprint 4 (perf) : les clients sont crees UNE seule fois, puis reutilises.
+# @lru_cache memorise le resultat de la fonction : le 1er appel cree les clients
+# (identifiants + connexions HTTPS), les appels suivants renvoient directement
+# les MEMES clients. Gain : plusieurs secondes par question dans l'API.
+@lru_cache(maxsize=1)
+def _clients():
+    """Renvoie (client_bedrock, client_opensearch), crees au 1er appel seulement."""
+    load_dotenv()
+    client_bedrock = creer_client_bedrock(os.getenv("AWS_PROFILE"), os.getenv("AWS_REGION"))
+    client_os = creer_client_opensearch(
+        os.getenv("OPENSEARCH_ENDPOINT"),
+        os.getenv("AWS_REGION"),
+        os.getenv("AWS_PROFILE"),
+    )
+    return client_bedrock, client_os
+
+
 def rechercher_chunks(question, k=K_PAR_DEFAUT):
     """Retrouve les k chunks les plus proches SEMANTIQUEMENT de la question.
 
@@ -25,18 +43,15 @@ def rechercher_chunks(question, k=K_PAR_DEFAUT):
     """
     load_dotenv()
 
+    # Clients Bedrock + OpenSearch : crees a la 1ere question, reutilises ensuite.
+    client_bedrock, client_os = _clients()
+
     # --- 1) Vectoriser la QUESTION, avec le MEME modele que les chunks ---
     #     Indispensable : question et chunks doivent vivre dans le meme espace
     #     vectoriel, sinon la notion de "distance" n'a aucun sens.
-    client_bedrock = creer_client_bedrock(os.getenv("AWS_PROFILE"), os.getenv("AWS_REGION"))
     vecteur_question = generer_embedding(client_bedrock, question)
 
-    # --- 2) Se connecter a la collection OpenSearch (client du Sprint 2) ---
-    client_os = creer_client_opensearch(
-        os.getenv("OPENSEARCH_ENDPOINT"),
-        os.getenv("AWS_REGION"),
-        os.getenv("AWS_PROFILE"),
-    )
+    # --- 2) Index OpenSearch a interroger (client du Sprint 2, deja pret) ---
     nom_index = os.getenv("INDEX_NAME", "smartovate-chunks")
 
     # --- 3) Construire la requete k-NN (plus proches voisins) ---

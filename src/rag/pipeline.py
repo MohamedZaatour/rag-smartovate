@@ -8,6 +8,7 @@
 # ============================================================
 
 import os
+import time
 
 from dotenv import load_dotenv
 
@@ -39,13 +40,17 @@ def _sources_depuis_chunks(chunks):
 def repondre(question, k=5):
     """Point d'entree UNIQUE du moteur RAG.
 
-    Renvoie un dict : {reponse, sources, tokens, appel_llm}.
+    Renvoie un dict : {reponse, sources, tokens, appel_llm, durees}.
+    'durees' = temps (en secondes) de chaque etape -> pour reperer la lente.
     """
     load_dotenv()
     score_min = float(os.getenv("SCORE_MIN", SCORE_MIN_DEFAUT))
+    durees = {}
 
     # [1] Recherche semantique (US 3.1)
+    debut = time.perf_counter()
     chunks = rechercher_chunks(question, k=k)
+    durees["recherche"] = round(time.perf_counter() - debut, 2)
 
     # [2] Garde-fou (couche 4) : le meilleur chunk est-il assez pertinent ?
     #     Les chunks sont deja tries -> le meilleur score est celui du 1er.
@@ -56,19 +61,23 @@ def repondre(question, k=5):
             "sources": [],
             "tokens": None,
             "appel_llm": False,     # Claude n'a PAS ete appele (economie + zero risque)
+            "durees": durees,
         }
 
     # [3] Construction du prompt (brique 1)
     prompt = construire_prompt(question, chunks)
 
     # [4] Generation de la reponse (brique 2)
+    debut = time.perf_counter()
     resultat = generer_reponse(prompt)
+    durees["generation"] = round(time.perf_counter() - debut, 2)
 
     return {
         "reponse": resultat["reponse"],
         "sources": _sources_depuis_chunks(chunks),
         "tokens": resultat["tokens"],
         "appel_llm": True,
+        "durees": durees,
     }
 
 
@@ -94,3 +103,4 @@ if __name__ == "__main__":
             print(f"   - {s['source']} p.{s['page']}  (score {s['score']})")
     if res["tokens"]:
         print(f"Tokens : {res['tokens']}")
+    print(f"Durees : {res['durees']}")

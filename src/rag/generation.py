@@ -7,6 +7,7 @@
 # ============================================================
 
 import os
+from functools import lru_cache
 
 import boto3
 from botocore.config import Config
@@ -35,6 +36,14 @@ def creer_client_bedrock(profil=None, region=None):
     return session.client("bedrock-runtime", config=_CONFIG)
 
 
+# Sprint 4 (perf) : meme principe que _clients() dans retrieval.py.
+# Le client Claude est cree une seule fois par couple (profil, region),
+# puis reutilise -> pas de nouvelle connexion HTTPS a chaque question.
+@lru_cache(maxsize=4)
+def _client_claude(profil, region):
+    return creer_client_bedrock(profil, region)
+
+
 def generer_reponse(prompt, model_id=None, profil=None, region=None):
     """Envoie le prompt a Claude (API Converse) et renvoie sa reponse.
 
@@ -46,7 +55,7 @@ def generer_reponse(prompt, model_id=None, profil=None, region=None):
     region = region or os.getenv("BEDROCK_LLM_REGION") or os.getenv("AWS_REGION")
     profil = profil or os.getenv("AWS_PROFILE")
 
-    client = creer_client_bedrock(profil, region)
+    client = _client_claude(profil, region)   # reutilise s'il existe deja
 
     # --- L'appel Converse ---
     #   system   <- les consignes (brique 1)

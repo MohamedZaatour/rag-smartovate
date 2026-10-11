@@ -7,6 +7,9 @@
 #  Doc interactive :          http://localhost:8000/docs
 # ============================================================
 
+import logging
+import time
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -14,6 +17,9 @@ from api.models import Question, Reponse
 from rag.pipeline import repondre   # le moteur complet du Sprint 3
 
 app = FastAPI(title="Smartovate RAG API", version="1.0")
+
+# Journal de l'API : les messages s'affichent dans le terminal d'uvicorn.
+log = logging.getLogger("uvicorn.error")
 
 # --- CORS ---
 # Utile SI un jour un client NAVIGATEUR (ex: React) appelle l'API.
@@ -40,4 +46,13 @@ def ask(q: Question):
     response_model=Reponse => FastAPI garantit que la sortie a bien la
     forme attendue (reponse + sources + appel_llm) et la serialise en JSON.
     """
-    return repondre(q.question, k=q.k)
+    log.info("[/ask] question recue : %r", q.question)
+    debut = time.perf_counter()
+
+    resultat = repondre(q.question, k=q.k)
+
+    log.info(
+        "[/ask] reponse prete en %.1f s  (detail : %s, Claude appele : %s)",
+        time.perf_counter() - debut, resultat.get("durees"), resultat.get("appel_llm"),
+    )
+    return resultat

@@ -13,17 +13,17 @@ python-dotenv==1.2.3     # Chargement de la configuration depuis un fichier .env
 opensearch-py==2.8.0     # Client Python pour Amazon OpenSearch Serverless (SigV4)
 
 # --- Sprint 4 : API backend + interface web ---
-fastapi>=0.115           # API backend : expose le moteur RAG en HTTP
-uvicorn[standard]>=0.30  # serveur ASGI qui fait tourner FastAPI
-streamlit>=1.38          # interface web (chatbot)
-requests>=2.32           # appels HTTP de Streamlit vers l'API
+fastapi==0.142.2         # API backend : expose le moteur RAG en HTTP
+uvicorn[standard]==0.54.0  # serveur ASGI qui fait tourner FastAPI
+streamlit==1.65.0        # interface web (chatbot)
+requests==2.34.2         # appels HTTP de Streamlit vers l'API
 
 # --- Sprints suivants (a decommenter le moment venu) ---
 # langchain      # Orchestration du flux RAG
 
 # --- Outils de developpement (tests) ---
-pytest>=8.0              # tests automatiques : lancer avec la commande "pytest"
+pytest==9.1.1            # tests automatiques : lancer avec la commande "pytest"
 
 # --- Sprint 1 / US 1.2 : decoupage (chunking) ---
-tiktoken>=0.7            # comptage/decoupage du texte en tokens
-markdown>=3.5             # convertit le Markdown des reponses en HTML (bulles stylees)
+tiktoken==0.14.0         # comptage/decoupage du texte en tokens
+markdown==3.11           # convertit le Markdown des reponses en HTML (bulles stylees)

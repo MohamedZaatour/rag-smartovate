@@ -1,0 +1,21 @@
+# ============================================================
+#  Fichiers JAMAIS envoyes a Docker lors du "docker build"
+#  (equivalent du .gitignore, mais pour Docker)
+# ============================================================
+
+# Secrets : ne doivent JAMAIS entrer dans une image
+.env
+
+# Historique Git et reglages de l'editeur
+.git
+.vscode
+
+# Fichiers temporaires Python / pytest
+**/__pycache__
+.pytest_cache
+
+# Dossiers inutiles pour faire tourner l'appli
+data/
+docs/
+infra/
+tests/

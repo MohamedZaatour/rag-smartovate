@@ -24,3 +24,6 @@ data/
 # --- OS ---
 .DS_Store
 Thumbs.db
+
+# Config Docker locale (copie de .env sans AWS_PROFILE) : ne jamais commiter / ne jamais mettre dans une image
+.env.docker

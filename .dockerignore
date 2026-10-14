@@ -19,3 +19,6 @@ data/
 docs/
 infra/
 tests/
+
+# Config Docker locale (copie de .env sans AWS_PROFILE) : ne jamais commiter / ne jamais mettre dans une image
+.env.docker

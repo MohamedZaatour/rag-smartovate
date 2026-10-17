@@ -8,6 +8,9 @@ from aws_cdk import (
 from constructs import Construct
 from dotenv import load_dotenv
 
+# Nom du task role du conteneur ECS (source unique : ecs_stack.py)
+from infra.ecs_stack import TASK_ROLE_NAME
+
 # Charge les variables du fichier .env (situé dans infra/) dans l'environnement
 load_dotenv()
 
@@ -59,6 +62,9 @@ class SmartovateRagStack(Stack):
             ]),
         )
 
+        # Roles autorises : ton role SSO + le task role du conteneur ECS (US 4.2)
+        task_role_arn = f"arn:aws:iam::{self.account}:role/{TASK_ROLE_NAME}"
+
         # --- Brique 3/4 : Data access policy (qui peut lire/écrire) ---
         data_access_policy = opensearchserverless.CfnAccessPolicy(
             self, "DataAccessPolicy",
@@ -90,7 +96,7 @@ class SmartovateRagStack(Stack):
                             ],
                         },
                     ],
-                    "Principal": [DATA_ACCESS_ROLE_ARN],
+                    "Principal": [DATA_ACCESS_ROLE_ARN, task_role_arn],
                 }
             ]),
         )

@@ -31,7 +31,7 @@ FICHIER_ENV_CONTENEUR = RACINE_PROJET / ".env.docker"
 ALLOWED_IPS = [ip.strip() for ip in os.environ["ALLOWED_IPS"].split(",") if ip.strip()]
 
 # Nom FIXE du task role -> ARN connu a l'avance (data access policy OpenSearch)
-TASK_ROLE_NAME = "smartovate-rag-task-role"
+TASK_ROLE_NAME = "smartovate-rag-mohamed-task-role"
 
 # Modele d'embedding : MEME valeur que src/ingestion/embeddings.py (a garder synchronise)
 MODELE_EMBEDDING = "amazon.titan-embed-text-v2:0"
@@ -75,7 +75,7 @@ class SmartovateRagEcsStack(Stack):
         # --- Bloc 3 : cluster ECS (regroupement logique, gratuit avec Fargate) ---
         cluster = ecs.Cluster(
             self, "RagCluster",
-            cluster_name="smartovate-rag-cluster",
+            cluster_name="smartovate-rag-mohamed-cluster",
             vpc=vpc,
         )
 
@@ -131,7 +131,7 @@ class SmartovateRagEcsStack(Stack):
         service = ecs_patterns.ApplicationLoadBalancedFargateService(
             self, "RagService",
             cluster=cluster,
-            service_name="smartovate-rag-service",
+            service_name="smartovate-rag-mohamed-service",
             load_balancer=alb,
             open_listener=False,          # pas d'ouverture 0.0.0.0/0 : l'acces est gere par sg_alb
             listener_port=80,

@@ -552,3 +552,138 @@ avant et après chaque test. Leçon : **toujours relancer toute la suite (`pytes
 
 ### 8. Prochaine étape
 - [ ] **US 4.2** : Docker (concepts puis Dockerfile), déploiement sur App Runner, README complet, PEP8.
+
+---
+
+## Sprint 4 — US 4.2 (1/2) : Conteneurisation Docker (12–14/10/2026)
+
+### 1. Objectif et résultat
+Emballer toute l'application (API + interface) dans une **image Docker** reproductible : première
+étape du déploiement demandé par le cahier (US 4.2). **Image construite et validée en local** :
+interface sur `localhost:8501`, 3 questions répondues (`POST /ask 200`), API invisible de l'extérieur
+(`localhost:8000/docs` → connexion refusée, comme voulu).
+
+### 2. Fichiers produits
+- `requirements.txt` : versions figées en `==` (reproductibilité) — commit `2148afa`.
+- `Dockerfile` : base `python:3.11-slim`, dépendances d'abord (étape gardée en cache), puis `src/` ;
+  le `CMD` lance l'API en arrière-plan sur `127.0.0.1:8000` et Streamlit au premier plan sur
+  `0.0.0.0:8501` — commit `ce978b6`.
+- `.dockerignore` : exclut les secrets (`.env`, `.env.docker`), `.git`, `data/`, `docs/`, `infra/`, `tests/`.
+- `.env.docker` (non versionné) : copie de `.env` **sans `AWS_PROFILE`** — commits `d7e0843`, `64e2af0`.
+
+### 3. Décisions
+- **Un seul conteneur** (API + Streamlit) : plus simple à déployer pour un PoC.
+  Deux conteneurs = piste d'évolution (isolation, moindre privilège, redémarrage indépendant).
+- **API privée** (`127.0.0.1`) / **Streamlit public** (`0.0.0.0`) : seule l'interface est exposée.
+- **Pas d'`AWS_PROFILE` dans le conteneur** : sans dossier `.aws`, la variable provoque `ProfileNotFound` ;
+  absente, boto3 suit sa chaîne d'identifiants (variables d'environnement en local, rôle IAM en production).
+
+### 4. Mesures
+| Mesure | Valeur |
+|---|---|
+| Taille de l'image | 1,05 Go sur disque / 251 Mo compressée |
+| Build initial / rebuild grâce au cache | 98 s / 0,8 s |
+| Recherche : 1re question (à froid) / suivantes | 4,3 s / 1,7 s |
+| RAM du conteneur au repos (`docker stats`) | 124 MiB (sur 15 Go disponibles) |
+
+### 5. Concepts appris
+- **Image** (le modèle figé) vs **conteneur** (l'image en marche) ; **Dockerfile** (la recette).
+- **Couches et cache** : l'ordre des instructions décide de ce qui est reconstruit.
+- **Contexte de build** et **`.dockerignore`** (ne jamais envoyer de secret dans une image).
+- **`127.0.0.1` vs `0.0.0.0`**, ports (`-p`), variables (`--env-file`, `-e`), `-d`, `--rm`, `--name`.
+- `docker ps / logs / stop / stats`, codes de sortie.
+- **RAM ≠ taille de l'image** : l'image est sur le disque, seule la partie utilisée est chargée en mémoire.
+
+### 6. Pièges rencontrés & résolus
+- `ProfileNotFound` à la 1re question avec `AWS_PROFILE=smartovate` ou `AWS_PROFILE=` (vide)
+  → **supprimer la ligne**, ne pas la laisser vide.
+- 16/10 : erreur 500 malgré `aws sso login` → le conteneur garde une **copie** des clés temporaires,
+  qui expirent. Il faut réexporter les clés (`aws configure export-credentials --profile smartovate
+  --format powershell | Invoke-Expression`) puis relancer le conteneur, dans un **terminal dédié**
+  (ces variables masquent le profil SSO pour uvicorn en local). En production, le **task role** supprime ce problème.
+
+---
+
+## Sprint 4 — US 4.2 (2/2) : Déploiement sur Amazon ECS Fargate (14–17/10/2026)
+
+### 1. Objectif et résultat
+Mettre l'application en ligne dans AWS, entièrement décrite en code (CDK), conformément au cahier
+(« déployée sur Amazon ECS »). **Déployée le 17/10/2026** : le chatbot répond via l'URL publique de
+l'ALB, avec une réponse sourcée de Claude servie entièrement depuis AWS (5 sources, scores 0,55–0,63).
+
+### 2. Choix de la plateforme
+| Option | Verdict | Raison |
+|---|---|---|
+| App Runner | ❌ | fermé aux nouveaux clients et **ne supporte pas les WebSockets entrants** (Streamlit en dépend) |
+| ECS Express Mode | ❌ | CDK uniquement en L1, ressources gérées hors CloudFormation |
+| EC2 + `docker run` | ❌ (plan B) | non conforme au cahier (« ECS »), maintenance du serveur à notre charge |
+| **ECS sur Fargate, construct CDK L3 `ApplicationLoadBalancedFargateService`** | ✅ | conforme, aucun serveur à gérer, tout en CloudFormation, ALB compatible WebSocket |
+
+### 3. Architecture déployée
+```
+Navigateur --HTTP:80--> ALB (vigile : IP autorisées uniquement)
+                          |
+                          v  port 8501 (vigile : uniquement depuis l'ALB)
+                   Tâche Fargate 0,5 vCPU / 1 Go
+                     |- Streamlit 0.0.0.0:8501
+                     '- API FastAPI 127.0.0.1:8000 --task role--> Bedrock (Titan + Claude) / OpenSearch
+VPC dédié 10.0.0.0/16 · 2 zones · sous-réseaux publics · 0 NAT · image dans ECR · logs CloudWatch
+```
+
+### 4. Code produit (`infra/`)
+- `infra/infra/ecs_stack.py` (nouvelle pile `SmartovateRagEcsStack`, 8 blocs commentés) : configuration
+  (`ALLOWED_IPS`, variables lues dans `.env.docker`) ; VPC ; cluster ; **task role**
+  `smartovate-rag-mohamed-task-role` (Bedrock + OpenSearch sur des ressources précises) ; groupe de
+  sécurité + ALB ; service Fargate (image construite par CDK, disjoncteur, déploiement sans coupure) ;
+  health check `/_stcore/health` ; sortie `TaskRoleArn`.
+- `infra/infra/infra_stack.py` : la data access policy OpenSearch autorise aussi le task role
+  (nom importé depuis `ecs_stack.py` : une seule source de vérité).
+- `infra/cdk.json` (bootstrap dédié `smartmoh`), `infra/app.py` (déclaration de la pile),
+  `infra/.env.example` (nouveau), `infra/cdk.context.json`.
+- Commits : `bb659d7`, `12410af`, `9e65598`, `1d69118`.
+
+### 5. Démarche
+1. **8 notions expliquées avant tout code** : ECR, Fargate, task definition / tâche / service / cluster,
+   execution role vs task role, VPC / sous-réseaux / NAT, groupes de sécurité, ALB / target group /
+   health check, bootstrap / assets.
+2. **Diagnostic en lecture seule** du compte (bootstrap, piles existantes) avant toute modification.
+3. **Pile écrite bloc par bloc**, puis `cdk synth` et vérification du modèle généré
+   (aucun secret dans le contexte de l'image, aucune NAT, règles réseau attendues).
+4. `cdk deploy` : 30 ressources en ~5 min ; CloudFormation attend que la tâche soit déclarée saine.
+5. Test, lecture des logs CloudWatch, correction, nouveau test.
+
+### 6. Pièges rencontrés & résolus (matière pour le rapport)
+| # | Symptôme | Cause | Résolution |
+|---|---|---|---|
+| 1 | `cdk deploy` impossible depuis le Sprint 2 | bucket du bootstrap CDK **partagé** supprimé par le sandbox (dérive) ; d'autres projets dépendent de ce bootstrap | **bootstrap dédié** `--qualifier smartmoh` (pile `CDKToolkit-Mohamed`), branché dans `cdk.json` |
+| 2 | avertissement « not tested with node v26 » | Node 26 (non LTS) installé dans l'env conda | `conda install -c conda-forge "nodejs=24"` |
+| 3 | `ENOTEMPTY ... jsii-kernel` en fin de commande | nettoyage d'un dossier temporaire sous Windows | sans conséquence, ignoré |
+| 4 | `Invalid request provided` + rollback au redéploiement de la pile OpenSearch | OpenSearch refuse une policy **identique** à l'existante | réalignement fait lors de la modification réelle suivante |
+| 5 | `Early validation failed : smartovate-rag-task-role already exists` | rôle du même nom laissé par un projet précédent | noms suffixés `-mohamed` (rôle, cluster, service) ; aucune ressource créée grâce à la validation anticipée |
+| 6 | page OK mais question → erreur 500 | **403 OpenSearch** lu dans CloudWatch (`aws logs tail`) : task role absent de la data access policy (double verrou IAM + policy) | task role ajouté à la policy (`infra_stack.py`) → réponse sourcée |
+
+### 7. Concepts appris
+- **ECS** (orchestrateur) et **Fargate** (exécution sans serveur à gérer) ; task definition, tâche,
+  service, cluster ; disjoncteur de déploiement et déploiement sans coupure (100 % / 200 %).
+- **Execution role** (préparer la tâche : ECR, logs) vs **task role** (le code : Bedrock, OpenSearch) ;
+  identifiants fournis et renouvelés automatiquement ; **moindre privilège**.
+- **VPC**, sous-réseaux publics / privés, Internet Gateway, NAT Gateway (coût), zones de disponibilité.
+- **Groupes de sécurité** : liste blanche, *stateful*, source = autre groupe ; `/32` vs `0.0.0.0/0`.
+- **ALB**, listener, target group, health check ; lire les symptômes (délai dépassé = vigile,
+  502/503 = aucune cible saine, erreur à la question = permissions).
+- **CDK** : bootstrap, qualificatif, assets et empreinte, `cdk synth / diff / deploy / destroy` ;
+  **CloudFormation** : change set, rollback, validation anticipée, dérive (*drift*).
+- **CloudWatch Logs** : `aws logs tail`, lire un traceback de bas en haut.
+
+### 8. Coût, limites et pistes
+- Coût estimé ~1,2 $/jour (ALB + Fargate) tant que la pile existe → `cdk destroy SmartovateRagEcsStack`
+  après les tests ; redéploiement en ~5 min grâce à l'infrastructure en code.
+- Limites : HTTP sans HTTPS ; le health check ne teste que Streamlit (pas l'API en arrière-plan) ;
+  historique perdu si la tâche est remplacée (pas de base de données) ; tâches en sous-réseaux publics
+  (choix de coût).
+- Pistes : HTTPS (nom de domaine + certificat ACM), sous-réseaux privés + NAT ou VPC endpoints,
+  ALB interne + VPN (outil interne), 2 conteneurs, health check couvrant l'API, alerte budget AWS.
+
+### 9. Prochaine étape
+- [ ] Captures pour le rapport (console ECS, target group, CloudWatch, CloudFormation), puis `cdk destroy`.
+- [ ] Passe `ruff` / PEP8, rapport final de stage, support de présentation.

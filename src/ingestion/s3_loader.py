@@ -28,9 +28,15 @@ def creer_client_s3(profil=None, region=None):
 
 
 def lister_documents_s3(s3, bucket):
-    """Renvoie la liste des noms de fichiers presents dans un bucket S3."""
-    reponse = s3.list_objects_v2(Bucket=bucket)
-    return [objet["Key"] for objet in reponse.get("Contents", [])]
+    """Renvoie la liste de TOUS les noms de fichiers presents dans un bucket S3.
+
+    S3 renvoie au plus 1000 fichiers par appel : le "paginator" de boto3
+    enchaine les appels tout seul, pour ne jamais en oublier.
+    """
+    cles = []
+    for page in s3.get_paginator("list_objects_v2").paginate(Bucket=bucket):
+        cles.extend(objet["Key"] for objet in page.get("Contents", []))
+    return cles
 
 
 def traiter_document_s3(s3, bucket, cle):
@@ -41,12 +47,14 @@ def traiter_document_s3(s3, bucket, cle):
     # 1) Telecharger dans le dossier temporaire du systeme (copie jetable)
     chemin_temp = os.path.join(tempfile.gettempdir(), os.path.basename(cle))
     s3.download_file(bucket, cle, chemin_temp)
-    # 2) Reutiliser notre chaine d'extraction locale
-    resultat = traiter_document(chemin_temp)
-    # 3) Noter la source S3 (pour citer les sources plus tard)
+    try:
+        # 2) Reutiliser notre chaine d'extraction locale
+        resultat = traiter_document(chemin_temp)
+    finally:
+        # 3) Supprimer la copie temporaire, MEME si l'extraction a echoue
+        os.remove(chemin_temp)
+    # 4) Noter la source S3 (pour citer les sources plus tard)
     resultat["source_s3"] = f"s3://{bucket}/{cle}"
-    # 4) Supprimer la copie temporaire
-    os.remove(chemin_temp)
 
     return resultat
 

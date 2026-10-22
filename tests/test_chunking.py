@@ -48,14 +48,14 @@ def test_texte_vide_donne_aucun_chunk():
 
 
 def test_taille_des_chunks_respectee():
-    texte = " ".join("m%d" % i for i in range(1, 101))  # 100 tokens
+    texte = " ".join(f"m{i}" for i in range(1, 101))  # 100 tokens
     chunks = chunking._decouper_texte(texte, taille_chunk=20, overlap=5)
     for c in chunks:
         assert len(c.split()) <= 20
 
 
 def test_overlap_correct():
-    texte = " ".join("m%d" % i for i in range(1, 51))  # 50 tokens
+    texte = " ".join(f"m{i}" for i in range(1, 51))  # 50 tokens
     chunks = chunking._decouper_texte(texte, taille_chunk=20, overlap=5)
     fin_du_chunk0 = chunks[0].split()[-5:]
     debut_du_chunk1 = chunks[1].split()[:5]
@@ -74,7 +74,7 @@ def test_metadonnees_conservees():
 
 
 def test_page_conservee_quand_la_page_se_decoupe():
-    longue = " ".join("m%d" % i for i in range(1, 46))  # 45 tokens -> plusieurs chunks
+    longue = " ".join(f"m{i}" for i in range(1, 46))  # 45 tokens -> plusieurs chunks
     chunks = chunking.decouper_document(_doc([longue]), taille_chunk=20, overlap=5)
     assert len(chunks) > 1
     assert all(c["page"] == 1 for c in chunks)

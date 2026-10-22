@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.models import Question, Reponse
-from rag.pipeline import repondre   # le moteur complet du Sprint 3
+from rag.pipeline import repondre  # le moteur complet du Sprint 3
 
 app = FastAPI(title="Smartovate RAG API", version="1.0")
 

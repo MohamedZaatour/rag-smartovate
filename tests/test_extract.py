@@ -6,8 +6,8 @@
 import docx
 import pymupdf
 import pytest
-from ingestion.extract import nettoyer_texte, traiter_document
 
+from ingestion.extract import nettoyer_texte, traiter_document
 
 # --- nettoyer_texte : fonction pure, facile a tester ---
 

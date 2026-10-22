@@ -9,5 +9,9 @@ src = ["src"]
 
 [lint.isort]
 # On le precise explicitement pour etre sur a 100% :
-# "ingestion" fait partie de notre projet -> 3e groupe d'imports.
-known-first-party = ["ingestion"]
+# nos propres modules forment le 3e groupe d'imports.
+# ("api_client" est dans src/frontend/ : Ruff ne peut pas le deviner seul.)
+known-first-party = ["ingestion", "indexation", "rag", "api", "api_client"]
+# Garder "from aws_cdk import (Stack, aws_ec2 as ec2, ...)" en UN seul bloc,
+# au lieu d'un import separe par alias.
+combine-as-imports = true

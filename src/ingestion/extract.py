@@ -6,7 +6,7 @@
 
 import os  # outils sur les chemins de fichiers
 import re  # nettoyage par motifs
-from datetime import datetime, timezone  # date/heure
+from datetime import UTC, datetime  # date/heure
 
 import docx  # lecture de Word
 import pymupdf  # lecture de PDF
@@ -119,7 +119,7 @@ def traiter_document(chemin):
     resultat = {
         "nom_fichier": os.path.basename(chemin),
         "type": type_doc,
-        "date_extraction": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "date_extraction": datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"),
         "nb_pages": len(pages_propres),
         "pages": pages_propres,
     }

@@ -11,7 +11,7 @@ from functools import lru_cache
 from dotenv import load_dotenv
 
 # On REUTILISE les briques deja construites et validees aux sprints precedents.
-from indexation.client import creer_client_opensearch                     # Sprint 2
+from indexation.client import creer_client_opensearch  # Sprint 2
 from ingestion.embeddings import creer_client_bedrock, generer_embedding  # Sprint 1
 
 # Le "K" de Top-K : combien de chunks on rapporte par defaut.

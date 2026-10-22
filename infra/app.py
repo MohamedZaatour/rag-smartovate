@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 import aws_cdk as cdk
-
-from infra.infra_stack import SmartovateRagStack
 from infra.ecs_stack import SmartovateRagEcsStack
+from infra.infra_stack import SmartovateRagStack
 
 app = cdk.App()
 

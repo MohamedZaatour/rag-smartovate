@@ -8,3 +8,6 @@ __pycache__
 .cdk.staging
 cdk.out
 .env
+
+# Cache CDK (contient l'ID du compte AWS) : recree automatiquement
+cdk.context.json
